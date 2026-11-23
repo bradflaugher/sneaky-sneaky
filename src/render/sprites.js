@@ -103,8 +103,9 @@ export function solveSkeleton(p, b) {
   const head = [0, neck[1] + Math.cos(hl) * 0.215 * b.head, neck[2] + Math.sin(hl) * 0.215 * b.head];
   const sw = b.shoulders;
   const arm = (side, ax, az, ex) => {
-    const base = at(0.55);
-    const S = [base[0] + side * sw * Math.cos(p.torsoRY), base[1], base[2] - side * sw * Math.sin(p.torsoRY)];
+    const base = at(0.49);
+    const armSw = sw * 0.88;
+    const S = [base[0] + side * armSw * Math.cos(p.torsoRY), base[1], base[2] - side * armSw * Math.sin(p.torsoRY)];
     const th = lean * 0.5 + ax;
     const E = [S[0] + side * Math.sin(az) * UPPER * H, S[1] - Math.cos(th) * Math.cos(az) * UPPER * H, S[2] - Math.sin(th) * Math.cos(az) * UPPER * H];
     const t2 = th + ex;
@@ -616,64 +617,79 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
     const Hd = pr(Arm.hand);
     const tip = { x: Hd.x + (Hd.x - W.x) * 1.1, y: Hd.y + (Hd.y - W.y) * 1.1 };
     chain([
-      [E, W, R(0.06), R(0.044), top],
-      [Sh, E, R(0.084), R(0.06), top], // a real deltoid at the top
+      [E, W, R(0.052), R(0.04), top],
+      [Sh, E, R(0.06), R(0.05), top],
     ]);
-    crease(E, Sh, R(0.06));
+    crease(E, Sh, R(0.05));
     // a gloved hand with a cuff, not a ball
-    limb(Hd, tip, R(0.05), R(0.038), glove, { hl: false });
+    limb(Hd, tip, R(0.044), R(0.034), glove, { hl: false });
     if (!st.holo) {
       const ang = Math.atan2(W.y - E.y, W.x - E.x) + Math.PI / 2;
-      line(g, st, [W.x + Math.cos(ang) * R(0.044), W.y + Math.sin(ang) * R(0.044), W.x - Math.cos(ang) * R(0.044), W.y - Math.sin(ang) * R(0.044)], 0.75, thief ? st.rim : null);
+      line(g, st, [W.x + Math.cos(ang) * R(0.04), W.y + Math.sin(ang) * R(0.04), W.x - Math.cos(ang) * R(0.04), W.y - Math.sin(ang) * R(0.04)], 0.75, thief ? st.rim : null);
     }
-    if (!thief && look.epaulettes) inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.07), R(0.09), R(0.03)), look.accent, { r: R(0.04), hl: false });
+    if (!thief && look.epaulettes) inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.05), R(0.075), R(0.025)), look.accent, { r: R(0.04), hl: false });
     if (!thief && look.beacon && near && !st.holo) {
       // a little shoulder beacon with a soft glow
-      const gr = g.createRadialGradient(Sh.x, Sh.y - R(0.08), 0, Sh.x, Sh.y - R(0.08), R(0.12));
+      const gr = g.createRadialGradient(Sh.x, Sh.y - R(0.06), 0, Sh.x, Sh.y - R(0.06), R(0.11));
       gr.addColorStop(0, css(look.accent, 0.55));
       gr.addColorStop(1, css(look.accent, 0));
       g.fillStyle = gr;
-      g.fillRect(Sh.x - R(0.14), Sh.y - R(0.22), R(0.28), R(0.28));
-      inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.08), R(0.026), R(0.026)), lift(look.accent, 0.4), { r: R(0.03), hl: false, shadeK: 0.95 });
+      g.fillRect(Sh.x - R(0.13), Sh.y - R(0.2), R(0.26), R(0.26));
+      inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.06), R(0.024), R(0.024)), lift(look.accent, 0.4), { r: R(0.03), hl: false, shadeK: 0.95 });
     }
     if (near && !thief) drawProp(g, st, look, Hd, E, fx, S);
   };
 
   // ---- order: far arm, legs, coat, torso, near arm(s), head
-  const arms = [sk.armL, sk.armR].map((A) => ({ A, d: pr(A.S).d })).sort((p, q) => p.d - q.d);
+  const T = pr(sk.top);
+  const arms = [sk.armL, sk.armR].map((A) => ({ A, d: pr(A.S).d, inFront: pr(A.E).d > T.d + 0.04 })).sort((p, q) => p.d - q.d);
   const side = Math.abs(fx) > 0.35;
-  if (side) drawArm(arms[0].A, false);
+  if (side) {
+    drawArm(arms[0].A, false);
+  } else {
+    for (const item of arms) if (!item.inFront) drawArm(item.A, item === arms[1]);
+  }
   const legs = [sk.legL, sk.legR].sort((p, q) => pr(p.K).d - pr(q.K).d);
   legs.forEach(drawLeg);
 
-  const T = pr(sk.top);
   const Pp = pr(sk.P);
   const td = (0.175 + b.belly * 0.3) * bulk;
   const taper = b.taper ?? 1;
-  const w1 = (b.shoulders * 1.02 * Math.abs(Math.cos(phi + pose.torsoRY)) + td * Math.abs(fx)) * S + R(0.03);
-  const w2 = (0.19 * bulk * taper * Math.abs(fz) + (td * 0.92 * Math.min(1, taper + 0.08) + b.belly * 0.35) * Math.abs(fx)) * S;
+  const w1 = (b.shoulders * 0.94 * Math.abs(fz) + td * Math.abs(fx)) * S + R(0.015);
+  const w2 = (0.185 * bulk * taper * Math.abs(fz) + (td * 0.92 * Math.min(1, taper + 0.08) + b.belly * 0.35) * Math.abs(fx)) * S;
   const ax = T.x - Pp.x;
   const ay = T.y - Pp.y;
   const al = Math.hypot(ax, ay) || 1;
-  const nx = -ay / al;
-  const ny = ax / al;
+  const ux = ax / al;
+  const uy = ay / al;
+  const nx = -uy;
+  const ny = ux;
   const sgn = nx >= 0 ? 1 : -1; // make +n point screen-right
   const N = { x: nx * sgn, y: ny * sgn };
   const belly = b.belly * S * 0.5 * Math.abs(fx) * (fx >= 0 ? 1 : -1);
-  // a soft trapezoid: rounded shoulders, gently rounded waist
-  const TL = { x: T.x - N.x * w1, y: T.y - N.y * w1 };
-  const TR = { x: T.x + N.x * w1, y: T.y + N.y * w1 };
+  // smooth anatomical shoulders: gentle trapezius slope from neck out to shoulders, tapering to waist
+  const drop = R(0.055);
+  const TL = { x: T.x - N.x * w1 - ux * drop, y: T.y - N.y * w1 - uy * drop };
+  const TR = { x: T.x + N.x * w1 - ux * drop, y: T.y + N.y * w1 - uy * drop };
   const BR = { x: Pp.x + N.x * w2, y: Pp.y + N.y * w2 + R(0.05) };
   const BL = { x: Pp.x - N.x * w2, y: Pp.y - N.y * w2 + R(0.05) };
-  const rTop = Math.min(w1 * 0.7, R(0.085));
   const rBot = Math.min(w2 * 0.6, R(0.05));
   const torsoPath = () => {
     g.beginPath();
     g.moveTo(T.x, T.y);
-    g.arcTo(TR.x, TR.y, BR.x, BR.y, rTop);
+    g.bezierCurveTo(
+      T.x + N.x * w1 * 0.65, T.y + N.y * w1 * 0.65 - uy * drop * 0.1,
+      TR.x + N.x * R(0.01), TR.y + N.y * R(0.01),
+      TR.x - ux * R(0.05), TR.y - uy * R(0.05),
+    );
     g.arcTo(BR.x, BR.y, BL.x, BL.y, rBot);
     g.arcTo(BL.x, BL.y, TL.x, TL.y, rBot);
-    g.arcTo(TL.x, TL.y, TR.x, TR.y, rTop);
+    g.lineTo(TL.x - ux * R(0.05), TL.y - uy * R(0.05));
+    g.bezierCurveTo(
+      TL.x - N.x * R(0.01), TL.y - N.y * R(0.01),
+      T.x - N.x * w1 * 0.65, T.y - N.y * w1 * 0.65 - uy * drop * 0.1,
+      T.x, T.y,
+    );
     g.closePath();
   };
   const bellyPath = Math.abs(belly) > 1 ? ell(g, (T.x + Pp.x) / 2 + N.x * (w1 + w2) * 0.42 * Math.sign(belly) + belly * 0.5, Pp.y + (T.y - Pp.y) * 0.32, Math.abs(belly) * 0.55 + w2 * 0.2, (Pp.y - T.y) * 0.26) : null;
@@ -912,17 +928,17 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
   else limb({ x: Nk.x, y: Nk.y + R(0.03) }, { x: (Nk.x + Hd.x) / 2, y: (Nk.y + Hd.y) / 2 }, R(0.064), R(0.058), thief ? look.suit : skin, { hl: false });
 
   if (!thief && look.collar && !st.holo) {
-    // a high popped greatcoat collar framing the jaw
-    for (const e of [1, -1]) {
-      const wing = () => {
-        g.beginPath();
-        g.moveTo(Nk.x + e * R(0.035), Nk.y + R(0.07));
-        g.lineTo(Nk.x + e * R(0.16) + fx * R(0.03), Nk.y - R(0.13));
-        g.lineTo(Nk.x + e * R(0.21), Nk.y + R(0.075));
-        g.closePath();
-      };
-      inkFill(g, st, wing, scale(top, 0.82), { r: R(0.1), fold: 0.2 });
-    }
+    // a tailored upturned greatcoat collar framing the neck cleanly
+    const collar = () => {
+      g.beginPath();
+      g.moveTo(Nk.x - R(0.14), Nk.y + R(0.06));
+      g.quadraticCurveTo(Nk.x - R(0.15), Nk.y - R(0.05), Nk.x - R(0.09), Nk.y - R(0.06));
+      g.lineTo(Nk.x + R(0.09), Nk.y - R(0.06));
+      g.quadraticCurveTo(Nk.x + R(0.15), Nk.y - R(0.05), Nk.x + R(0.14), Nk.y + R(0.06));
+      g.quadraticCurveTo(Nk.x, Nk.y + R(0.1), Nk.x - R(0.14), Nk.y + R(0.06));
+      g.closePath();
+    };
+    inkFill(g, st, collar, scale(top, 0.82), { r: R(0.1), fold: 0.2 });
   }
   if (!thief && look.beacon && !st.holo && fz > -0.4) {
     // collar tubing from the helmet down to the chest unit
@@ -938,8 +954,11 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
     g.stroke();
   }
 
-  if (!side) drawArm(arms[0].A, false);
-  drawArm(arms[1].A, true);
+  if (side) {
+    drawArm(arms[1].A, true);
+  } else {
+    for (const item of arms) if (item.inFront) drawArm(item.A, item === arms[1]);
+  }
 
   drawHead(g, st, Hd.x, Hd.y, r, phi + pose.headYaw, look, pose.mood);
 }
