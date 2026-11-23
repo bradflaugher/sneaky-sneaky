@@ -59,8 +59,9 @@ export function createFx(parent) {
     },
     /** Persistent head icon for a guard; returns a handle. */
     headIcon() {
-      const q = sprite(stampTexture('?', '#ffb000'));
-      const bang = sprite(stampTexture('!', '#e0101f', { burstColor: '#efe6d2' }));
+      // jagged comic bursts: ?! for suspicion, !! for the moment it all goes wrong
+      const q = sprite(stampTexture('?!', '#0b0d12', { burstColor: '#ffd23a' }));
+      const bang = sprite(stampTexture('!!', '#ffd23a', { burstColor: '#e5352b' }));
       q.visible = bang.visible = false;
       let pop = 0;
       return {
@@ -71,13 +72,13 @@ export function createFx(parent) {
             pop = Math.min(1, pop + dt * 7);
             const s = 1.0 + Math.sin(pop * Math.PI) * 0.8;
             bang.position.set(x, y + 0.2, z);
-            bang.scale.setScalar(1.25 * s);
+            bang.scale.setScalar(1.5 * s);
             bang.material.rotation = -0.18;
           } else {
             pop = 0;
             if (kind === '?') {
               q.position.set(x, y + 0.08, z);
-              q.scale.setScalar(0.5 + 0.4 * amount);
+              q.scale.setScalar(0.62 + 0.45 * amount);
               q.material.rotation = 0.15;
               q.material.opacity = 0.55 + 0.45 * amount;
             }

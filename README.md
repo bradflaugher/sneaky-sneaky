@@ -1,8 +1,13 @@
 # Sneaky Sneaky
 
-A weaponless, pacifist 3D stealth puzzle game for the browser, with proper
+**[sneakysneaky.win](https://sneakysneaky.win/)**
+
+<p align="center">
+  <img src="docs/gameplay.gif" width="100%" alt="Sneaky Sneaky gameplay: an all-black phantom thief sneaking through comic-book HD-2D superyachts, midnight museums, and secret science labs with Ben-Day halftone lighting, crouching behind cover, knocking to distract guards, and stealing procedurally generated heist targets.">
+</p>
+
+A weaponless, pacifist HD-2D comic-book stealth puzzle game for the browser, with proper
 desktop controls and portrait + landscape phone controls.
-Target: <https://sneakysneaky.win>
 
 No weapons, ever. Sneak past guards, crouch behind cover, crawl vents, knock
 to distract, put the occasional guard to sleep, and steal extremely silly
@@ -25,7 +30,7 @@ Every room rolls its own heist target and its own address from the seed.
 - Each target has a tagline, a serial (`FILE #492-K`) and a rarity
   (`CONTRABAND`, `RARE`, `ABSURD`, `SIGNATURE`).
 - Each also has a `propSpec`, which `src/render/lootProps.js` turns into a
-  flat-shaded, ink-outlined 3D prop: one of 34 base silhouettes, coloured by
+  smooth, cel-shaded, ink-outlined 3D prop: one of 34 base silhouettes, coloured by
   the material word (a *Brass* anything is brass), with optional glow
   (*Haunted*, *Mildly Radioactive*, *Neon*…), tilt, scale and a topper
   (ribbon, price tag, bow, evidence marker, or a halo on ABSURD drops).
@@ -39,51 +44,62 @@ Every room rolls its own heist target and its own address from the seed.
 Difficulty never changes the prize: target and venue depend only on the seed
 and theme.
 
-## Your agent
+## The cast
 
-There is no default hero. A new player is dealt a random original agent
-(outfit, two-tone palette, headgear, hair, skin tone, build, codename), and the
-first **START HEIST** opens **Select Your Agent**: keep them, hit **REROLL
-AGENT**, or tailor every detail, then **CONFIRM & DEPLOY**. After that, runs
-start immediately; the agent screen stays available from the title and pause
-menus.
+**The thief** is one fixed figure: an anonymous burglar in matte black from
+mask to boots, with slate-blue comic rim light. No name, no face, no
+customisation; pressing **START HEIST** goes straight into the heist.
 
-- 8 outfits: Long Coat, Cropped Moto Jacket, Hooded Parka, Tailored Heist
-  Suit, Tech Vest, Jumpsuit, Stealth Poncho, Tactical Rig.
-- 12 head options: Hood, Bucket Hat, Beanie, Round Shades, Visor Cap,
-  Headphones, Flat Cap, Cropped Hair, Spiky Hair, Ponytail, Goggles, Bandana.
-- 16 cohesive palettes, 8 hair colours, 6 skin tones, 5 builds.
-- Guards are generated the same way per room: each theme has its own pool of
-  outfits, palettes, headgear, builds, scarves, shades and facial hair.
+**Guards** are procedurally generated per room from five comic archetypes,
+weighted by setting, each with randomised build, skin tone, hair, headwear,
+eyewear, facial hair, scarf, badge, uniform colours and hand prop:
 
-The generator lives in `src/core/agent.js` and is unit tested.
+| Archetype | Look | Mostly found |
+| --- | --- | --- |
+| Heavy Enforcer | broad bruiser in a coat or vest, shades, flashlight or baton | yacht, bunker |
+| Night Watchman | rumpled uniform, peaked cap, thermos or keys, a bit of a belly | office, museum |
+| Tech Specialist | visor helmet or headset, utility vest, glowing scanner | lab, VR |
+| Gala Security | tailored blazer and tie, earpiece, slick hair or fedora | yacht, museum |
+| Tactical Officer | greatcoat or field jacket, beret, epaulettes, radio | bunker |
+
+The definitions live in `src/core/cast.js` and are unit tested.
 
 ## Art direction
 
-Green noir. Shadows fall to deep emerald and jade; each setting adds exactly
-one counter-colour for its light. The aim is a calm, composed frame where the
-eye goes straight to the agent, the guards, their cones and the loot.
+A hyper-modern graphic novel in HD-2D: hand-inked 2D comic characters standing
+in a smooth, lit 3D diorama.
 
-- **Quiet surfaces**: floors and walls are broad architectural panels with
-  hairline seams and gentle tonal drift (`src/render/textures.js`). The floor
-  has a soft sheen so lamp pools bloom across it.
-- **Characters** are angular flat-shaded low-poly built from tapered boxes,
-  with a thin ink hull and a soft rim light. Ink outlines are reserved for
-  characters and the loot; walls and props carry no edge lines.
-- **Light**: one sculptural key with shadows, a warm or luminous practical per
-  chamber with a floor pool and a slowly drifting volumetric shaft, light fog.
-- **Finishing pass** (`src/render/comicPass.js`): crisp sampling, hairline ink
-  on decisive edges only, emerald shadow tint with a warm highlight lift, a
-  whisper of Bayer dither in deep shadow, fine grain, soft vignette, gentle
-  bloom. **Visual Style** in the pause menu: `Noir Hybrid` (default) or
-  `Clean Crisp`.
-- **Six two-tone settings**: ocean teal + amber deck lamps (yacht),
-  emerald-slate + cyan CRT (office), jade-obsidian + mint (lab), verdigris +
-  terracotta tungsten (bunker), obsidian-emerald + gallery gold with a little
-  crimson (museum), abyssal black + phosphor mint (VR).
-- **HUD** is corner-only and hairline: objective top-left, radar top-right.
-  The room briefing is a lower-third strip that fades in about 1.8 s, and the
-  key legend fades after a few seconds, so nothing sits over the play field.
+- **Characters are 2D illustrations**, not 3D models. `src/render/sprites.js`
+  poses a small skeleton (six-frame walk cycle, prowling crouch, sleeper hold,
+  startled recoil, look-around, asleep on the floor), projects it from one of
+  five view angles (front, 3/4, profile, 3/4 back, back; mirrored for the other
+  side) and draws over it in Canvas2D: variable-weight ink, flat colour, a cel
+  fold, a rim highlight and Ben-Day dots. Frames are drawn on demand at
+  512 px (thief) or 384 px (guards) and cached.
+- **Standees in 3D** (`src/render/character.js`): each character is a
+  camera-facing plane that picks its view from the angle between its heading
+  and the camera, leans back as the camera climbs, casts a real alpha-tested
+  shadow and sits on a soft contact shadow. Behind scenery it shows as a flat
+  silhouette.
+- **The diorama** is smooth and modern: bevelled furniture, round rails and
+  pods, arched doorways, cel-shaded materials, high-resolution painted
+  textures with linear and anisotropic filtering. Nothing is pixelated.
+- **Print finish** (`src/render/comicPass.js`), at native resolution: thin ink
+  accents on strong edges, a rich colour grade, a rotated Ben-Day halftone
+  screen in the shadow midtones, soft bloom and a gentle vignette.
+  **Visual Style** in the pause menu: `Comic Print` (default) or `Clean Ink`.
+- **Six colour stories**: indigo sea and golden deck lamps on mahogany
+  (yacht), twilight cobalt with cyan monitors and amber pools (office),
+  slate-teal with mint pods and warm-white spots (lab), indigo dusk over
+  sienna stone (bunker), plum and emerald marble under gold spots with crimson
+  velvet (museum), navy void with electric cyan and magenta (VR).
+- **Cones and lettering**: vision cones are translucent washes with a halftone
+  fill and an inked edge; `TAP! TAP!`, `SHHH...`, `ZZZ...`, `YOINK!` and the
+  `?!` / `!!` bursts are drawn as hand-lettered stamps in the world.
+- **Interface**: cream comic panels with ink borders and hard offset shadows,
+  yellow caption boxes, a cover-style title ("ISSUE #1"), `BUSTED!!` and
+  `CLEAN GETAWAY!` bursts. In play the HUD stays in the corners and the issue
+  banner is a lower-third box that clears in about 1.8 s.
 
 ## Play
 
@@ -108,8 +124,8 @@ npm run dev        # http://localhost:5173
 ### How it works
 
 - **Vision cones are real.** Each cone is raycast against the room every
-  frame, so walls and cover visibly cut it. The solid part sees you even
-  crouched; the striped part only sees you standing (it's looking over
+  frame, so walls and cover visibly cut it. The washed part sees you even
+  crouched; the dots-only part only sees you standing (it's looking over
   waist-high cover).
 - **Detection is a meter, not a tripwire.** Close up it fills almost
   instantly; at the far edge you get about a second. Cyan → amber `?` → red `!`.
@@ -203,7 +219,7 @@ src/main.js           entry point
 src/style.css         all UI styling (100dvh, safe-area insets, portrait/landscape)
 src/core/             pure logic, no three.js, unit tested
   rng.js              seeded PRNG
-  agent.js            random original agents, options, save migration
+  cast.js             the thief and the five guard archetypes
   grid.js             cells, DDA raycast, line of sight, pathfinding
   patrol.js           patrol timelines (pose as a function of time)
   stealth.js          vision, detection rate, choke-out arc, ranking
@@ -212,10 +228,10 @@ src/core/             pure logic, no three.js, unit tested
   difficulty.js       presets, ramp maths, shareable setup params
   themes.js           the six settings and the venue-name generator
   loot.js             signature items and the procedural loot engine
-src/render/           three.js: toon/ink kit, pixel textures, characters, world,
-                      cones, comic stamps, comic post pass
+src/render/           three.js: 2D comic sprite illustrator, standee rigs, painted
+                      textures, world, cones, comic stamps, print finishing pass
 src/game/             game loop, camera, input, audio, save data
-src/ui/               HUD/menus, radar, customizer form, mission setup panel
+src/ui/               HUD/menus, radar, mission setup panel
 tests/                node:test suites
 public/               _headers, favicon.svg, site.webmanifest
 ```

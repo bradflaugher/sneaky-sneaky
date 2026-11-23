@@ -1,7 +1,7 @@
 // The shared look: hard-stepped cel shading, flat facets and black ink.
 //
-//  toon()        – MeshToonMaterial with a 4-band gradient + flat shading, so
-//                  light breaks into comic ink blocks instead of soft gradients
+//  toon()        – MeshToonMaterial with a stepped gradient, so light breaks
+//                  into clean cel bands on smooth, rounded forms
 //  inkHull()     – inverted-hull black outline for a mesh (characters, loot)
 //  inkEdges()    – black EdgesGeometry lines for hard-surface props and walls
 
@@ -26,7 +26,7 @@ export function toon(color, opts = {}) {
   const params = { color, gradientMap: toonGradient() };
   for (const k of SUPPORTED) if (opts[k] !== undefined) params[k] = opts[k];
   const m = new THREE.MeshToonMaterial(params);
-  m.flatShading = opts.flatShading !== false;
+  m.flatShading = opts.flatShading === true; // smooth by default: nothing should look blocky
   return m;
 }
 
@@ -57,7 +57,7 @@ export function rimify(mat, color = 0xffffff, strength = 0.55) {
   return mat;
 }
 
-const INK = new THREE.MeshBasicMaterial({ color: 0x04100c, side: THREE.BackSide });
+const INK = new THREE.MeshBasicMaterial({ color: 0x0b0d12, side: THREE.BackSide });
 const INK_LINE = new THREE.LineBasicMaterial({ color: 0x030303 });
 const _box = new THREE.Box3();
 const _size = new THREE.Vector3();

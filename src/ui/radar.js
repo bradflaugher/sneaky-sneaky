@@ -22,9 +22,9 @@ export class Radar {
     this.ox = (S - room.w * scale) / 2;
     this.oy = (S - room.h * scale) / 2;
     const g = this.bg.getContext('2d');
-    g.fillStyle = '#020607';
+    g.fillStyle = '#101626';
     g.fillRect(0, 0, S, S);
-    g.strokeStyle = 'rgba(62,240,208,0.09)';
+    g.strokeStyle = 'rgba(246,239,220,0.06)';
     g.lineWidth = 1;
     for (let i = 0; i <= S; i += S / 10) {
       g.beginPath();
@@ -37,9 +37,9 @@ export class Radar {
     for (let y = 0; y < room.h; y++)
       for (let x = 0; x < room.w; x++) {
         const c = room.cells[y * room.w + x];
-        if (c === WALL) g.fillStyle = 'rgba(62,240,208,0.55)';
-        else if (c === COVER) g.fillStyle = 'rgba(62,240,208,0.22)';
-        else g.fillStyle = 'rgba(62,240,208,0.045)';
+        if (c === WALL) g.fillStyle = 'rgba(246,239,220,0.82)';
+        else if (c === COVER) g.fillStyle = 'rgba(246,239,220,0.3)';
+        else g.fillStyle = 'rgba(246,239,220,0.05)';
         g.fillRect(this.ox + x * scale, this.oy + y * scale, scale + 0.5, scale + 0.5);
       }
     room.vents.forEach((v, i) => {
@@ -116,7 +116,7 @@ export class Radar {
         g.fillText('z', X(gd.x) - s * 0.3, Y(gd.z) + s * 0.4);
         continue;
       }
-      const col = gd.alert ? '255,31,47' : gd.meter > 0.3 || gd.wary ? '255,176,0' : '25,240,224';
+      const col = gd.alert ? '229,53,43' : gd.meter > 0.3 || gd.wary ? '255,210,58' : '58,232,255';
       g.fillStyle = `rgba(${col},0.33)`;
       g.beginPath();
       g.moveTo(X(gd.x), Y(gd.z));
@@ -140,7 +140,7 @@ export class Radar {
       g.translate(X(p.x), Y(p.z));
       g.rotate(p.ang);
       g.fillStyle = '#ffffff';
-      g.shadowColor = '#3ef0d0';
+      g.shadowColor = '#3ae8ff';
       g.shadowBlur = 8;
       g.beginPath();
       g.moveTo(s * 0.75, 0);
@@ -154,8 +154,8 @@ export class Radar {
     // sweep line
     const sw = ((t * 0.35) % 1) * this.canvas.height;
     const gr = g.createLinearGradient(0, sw - 26, 0, sw);
-    gr.addColorStop(0, 'rgba(62,240,208,0)');
-    gr.addColorStop(1, 'rgba(62,240,208,0.16)');
+    gr.addColorStop(0, 'rgba(246,239,220,0)');
+    gr.addColorStop(1, 'rgba(246,239,220,0.1)');
     g.fillStyle = gr;
     g.fillRect(0, sw - 26, this.canvas.width, 26);
   }

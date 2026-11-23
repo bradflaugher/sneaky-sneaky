@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { WALL, cellAt } from '../core/grid.js';
 import { RNG } from '../core/rng.js';
 import { ART, VENT_COLORS, WALL_H } from './themeArt.js';
@@ -109,15 +110,15 @@ export function buildWorld(room, { lowPower = false } = {}) {
     return m;
   };
   if (art.env === 'ocean') {
-    const sea = ground(new THREE.MeshBasicMaterial({ color: 0x020409 }), -2.4);
+    const sea = ground(new THREE.MeshBasicMaterial({ color: 0x0a1a3a }), -2.4);
     sea.receiveShadow = false;
-    const hullM = std(0x3a3f45, { map: miscTexture('metal') });
+    const hullM = std(0xe8e0cc);
     mesh(new THREE.BoxGeometry(w + 3, 2.6, h + 3), hullM).position.set(w / 2, -1.32, h / 2);
     const bow = mesh(new THREE.CylinderGeometry((h + 3) / 2 / Math.cos(Math.PI / 4) / 1.4142, (h + 3) / 2.4, 2.6, 4, 1), hullM);
     bow.rotation.y = Math.PI / 4;
     bow.scale.set(1.5, 1, 1);
     bow.position.set(w + 1.5, -1.32, h / 2);
-    mesh(new THREE.BoxGeometry(w + 3.1, 0.25, h + 3.1), std(0x7a0f1c)).position.set(w / 2, -1.4, h / 2);
+    mesh(new THREE.BoxGeometry(w + 3.1, 0.25, h + 3.1), std(0x7a4020)).position.set(w / 2, -1.4, h / 2);
     for (let i = 0; i < 26; i++) {
       const s = decal(0xffa238, rng.range(3, 9), w / 2 - rng.range(20, 120), h / 2 + rng.range(-70, 70), 0.25, -2.38);
       s.scale.y = 0.18;
@@ -142,7 +143,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     for (let i = 0; i < 16; i++) {
       const a = rng.range(0, Math.PI * 2);
       const d = rng.range(Math.max(w, h) * 0.75 + 6, 70);
-      const dune = mesh(new THREE.IcosahedronGeometry(1, 1), std(0x1c1510), group, false);
+      const dune = mesh(new THREE.SphereGeometry(1, 24, 12), std(0x3a2a52), group, false);
       dune.scale.set(rng.range(6, 16), rng.range(1.2, 4), rng.range(5, 12));
       dune.position.set(w / 2 + Math.cos(a) * d, -0.3, h / 2 + Math.sin(a) * d);
       dune.rotation.y = rng.range(0, 3);
@@ -232,7 +233,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
       add(wallBox(r.x, 0, r.y, r.x + r.w, 0.82, r.y + r.h), wallMat);
       add(new THREE.BoxGeometry(r.w + 0.06, 0.07, r.h + 0.06).translate(r.x + r.w / 2, 0.855, r.y + r.h / 2), capMat, false);
       const rails = [new THREE.BoxGeometry(long ? r.w : 0.07, 0.06, long ? 0.07 : r.h).translate(r.x + r.w / 2, 1.22, r.y + r.h / 2)];
-      for (let k = 0.5; k < len; k += 2) rails.push(new THREE.CylinderGeometry(0.025, 0.025, 0.36, 6).translate(long ? r.x + k : r.x + 0.5, 1.04, long ? r.y + 0.5 : r.y + k));
+      for (let k = 0.5; k < len; k += 2) rails.push(new THREE.CylinderGeometry(0.025, 0.025, 0.36, 12).translate(long ? r.x + k : r.x + 0.5, 1.04, long ? r.y + 0.5 : r.y + k));
       add(mergeGeometries(rails), railMat);
       rails.forEach((x) => x.dispose());
     } else if (art.outer === 'glass') {
@@ -263,29 +264,30 @@ export function buildWorld(room, { lowPower = false } = {}) {
     darkwood: std(0x9a8a7a, { map: miscTexture('wood') }),
     crate: std(0xffffff, { map: miscTexture('crate') }),
     ammo: std(0xffffff, { map: miscTexture('ammo') }),
-    fabric: std(0x4a5670, { map: miscTexture('fabric') }),
-    white: std(0x6f7872, { map: miscTexture('metal') }),
-    leather: std(0x8a7a5a),
-    brass: std(0xb8862a),
+    fabric: std(0x5f78b8, { map: miscTexture('fabric') }),
+    white: std(0xcfc6b0),
+    leather: std(0xd6ccb4),
+    brass: std(0xe0b040),
     metal: std(0xffffff, { map: miscTexture('metal') }),
-    darkmetal: std(0x1a1d22),
-    labwhite: std(0x6f8880, { map: miscTexture('metal') }),
-    sandbag: std(0x7a6646, { map: miscTexture('fabric') }),
-    marble: std(0x8f958a),
-    darkmarble: std(0x14131a),
-    velvet: std(0x4e0b16),
+    darkmetal: std(0x262a3a),
+    labwhite: std(0xb4c8cc),
+    sandbag: std(0xc9a070, { map: miscTexture('fabric') }),
+    marble: std(0xcac2b0),
+    darkmarble: std(0x2c1a38),
+    velvet: std(0x9a1426),
     glass: std(0x9fc8ff, { transparent: true, opacity: 0.16 }),
-    leaf: std(0x1f4a2a),
+    leaf: std(0x2f9a5c),
     screen: glowMat(art.glow, 1.6),
     warm: glowMat(0xffb040, 2),
     accent: std(art.accent),
     holo: new THREE.MeshBasicMaterial({ color: 0x010b0d, transparent: true, opacity: 0.9 }),
-    gold: std(0xc9a24a),
+    gold: std(0xf0c040),
   };
-  const unitBox = new THREE.BoxGeometry(1, 1, 1);
-  const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
-  const unitSph = new THREE.IcosahedronGeometry(0.5, 1);
-  const unitIco = new THREE.IcosahedronGeometry(0.5, 0);
+  // Soft, modern forms: every box is bevelled, every round thing is truly round.
+  const unitBox = new RoundedBoxGeometry(1, 1, 1, 3, 0.03);
+  const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 28);
+  const unitSph = new THREE.SphereGeometry(0.5, 24, 16);
+  const unitIco = new THREE.IcosahedronGeometry(0.5, 2);
   disposables.push(unitBox, unitCyl, unitSph, unitIco);
   const part = (parent, geo, mat, sx, sy, sz, x, y, z, shadow = true) => {
     const m = new THREE.Mesh(geo, mat);
@@ -585,7 +587,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
               p(unitCyl, M.accent, 0.13, 0.06, 0.13, 0.2, 2.1, 0.08).rotation.z = Math.PI / 2;
             }
           } else if (t === 'yacht') {
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.045, 8, 20), roll < 0.5 ? M.brass : std(0xe8452f, { roughness: 0.5 }));
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.045, 12, 32), roll < 0.5 ? M.brass : std(0xe8452f, { roughness: 0.5 }));
             ring.position.set(0, 1.5, 0.04);
             d.add(ring);
             disposables.push(ring.geometry);
@@ -745,6 +747,22 @@ export function buildWorld(room, { lowPower = false } = {}) {
       animated.push((t) => (pool.material.opacity = 0.4 + Math.sin(t * 2.5 + vi) * 0.12));
     });
   });
+
+  // ------------------------------------------------------------ arched doorways
+  {
+    const archGeo = new THREE.TorusGeometry(1, 0.085, 10, 28, Math.PI);
+    disposables.push(archGeo);
+    const archMat = std(art.cap);
+    for (const d of room.doors) {
+      const a = d.cells[0];
+      const b = d.cells[1];
+      const arch = new THREE.Mesh(archGeo, archMat);
+      arch.position.set((a.cx + b.cx) / 2 + 0.5, WALL_H - 1.0, (a.cy + b.cy) / 2 + 0.5);
+      arch.rotation.y = d.vertical ? Math.PI / 2 : 0;
+      arch.castShadow = true;
+      group.add(arch);
+    }
+  }
 
   // ------------------------------------------------------------ lasers + switches
   const beamM = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.35, 0.3), toneMapped: false });
