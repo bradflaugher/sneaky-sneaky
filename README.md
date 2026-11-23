@@ -12,6 +12,57 @@ over — one tap (or `R` / `Space`) and you're back at the start of the room.
 Everything is procedural: rooms, guards, textures, characters, loot props and
 sound. There are no downloaded assets.
 
+## Infinite loot and venues
+
+Every room rolls its own heist target and its own address from the seed.
+
+- **Targets** are assembled from word banks as
+  `[Owner] [Adjective] [Material] [Object] [(Tag)]`, for example *The
+  Trustees' Overdue Toaster (Missing One Screw)* or *An Unclaimed Classified
+  Carbon-Fibre Fire Hydrant (Slightly Haunted)*. Owners are theme-specific
+  plus a universal pool. That is roughly 39 million names per theme.
+- About 15% of rooms drop one of the 28 handcrafted **SIGNATURE** classics.
+- Each target has a tagline, a serial (`FILE #492-K`) and a rarity
+  (`CONTRABAND`, `RARE`, `ABSURD`, `SIGNATURE`).
+- Each also has a `propSpec`, which `src/render/lootProps.js` turns into a
+  flat-shaded, ink-outlined 3D prop: one of 34 base silhouettes, coloured by
+  the material word (a *Brass* anything is brass), with optional glow
+  (*Haunted*, *Mildly Radioactive*, *Neon*…), tilt, scale and a topper
+  (ribbon, price tag, bow, evidence marker, or a halo on ABSURD drops).
+- **Venues** are generated the same way: *M/Y Quiet Money VII · Tender
+  Garage*, *Ledger Tower · Floor 97 (Executive Wing)*, *Sub-Level 22 ·
+  Condemned Containment D*, *VR Simulation 0x9F · Ghost Protocol 07*.
+- The **Loot Vault** files every unique artifact with its venue, sector,
+  rarity, serial and best rank. It filters by rarity, pages 36 at a time, and
+  keeps the newest 500 unique items (signature pieces are never evicted).
+
+Difficulty never changes the prize: target and venue depend only on the seed
+and theme.
+
+## Art direction
+
+PS1 *Metal Gear Solid* (1998) by way of 90s black-ink comics and Persona-style
+graphic UI. Dark, nocturnal, high contrast.
+
+- **Characters** are angular flat-shaded low-poly built from tapered boxes:
+  broad shoulders, V-chest, chest rigs and pouches, heavy brow and eyes lost
+  in shadow, a bandana with trailing tails. No spheres, no capsules. Guards
+  get helmets, balaclavas, gas masks, visors, fedoras and trenchcoat tails.
+- **Ink**: inverted-hull black outlines on characters and loot, crease lines
+  (`EdgesGeometry`) on walls and props, stepped fresnel rim highlights.
+- **Cel shading**: `MeshToonMaterial` with a hard 4-band gradient and flat
+  facets everywhere (`src/render/toon.js`).
+- **Pixel textures**: 64–128 px procedural canvases sampled with
+  `NearestFilter`: grime, stains, cracks, drips, crosshatch grain.
+- **Comic pass** (`src/render/comicPass.js`): chunky pixel grid, luma-edge ink
+  contours, crushed-black noir grade with per-theme tints, 4×4 Bayer dithering
+  with colour quantisation in the shadows, film grain, vignette.
+- **Visual Style** (pause menu): `PS1 Comic` (default) or `Crisp Ink`, which
+  keeps the ink and grade but drops the pixelation and most of the dither.
+- **Six night settings**: storm-lashed yacht under sodium lamps, 2AM noir
+  skyscraper, grimy acid-green bio-bunker, floodlit canyon stronghold, noir
+  museum vault in gold and crimson, and a black-and-phosphor VR Missions grid.
+
 ## Play
 
 ```bash
@@ -136,8 +187,10 @@ src/core/             pure logic, no three.js, unit tested
   solver.js           topology + time-expanded ghost-route verifiers
   generator.js        room generator
   difficulty.js       presets, ramp maths, shareable setup params
-  themes.js, loot.js  the six settings and 28 loot items
-src/render/           three.js: textures, characters, world, cones, effects
+  themes.js           the six settings and the venue-name generator
+  loot.js             signature items and the procedural loot engine
+src/render/           three.js: toon/ink kit, pixel textures, characters, world,
+                      cones, comic stamps, comic post pass
 src/game/             game loop, camera, input, audio, save data
 src/ui/               HUD/menus, radar, customizer form, mission setup panel
 tests/                node:test suites
@@ -147,7 +200,7 @@ public/               _headers, favicon.svg, site.webmanifest
 ## Scripts
 
 ```bash
-npm test         # unit tests: 250+ seeded rooms across all 6 themes, presets and size tiers
+npm test         # unit tests: 250+ seeded rooms, presets, size tiers, 3000 loot drops
 npm run lint     # ESLint 9 flat config, zero warnings allowed
 npm run build    # static site in dist/, ready for Cloudflare Pages
 npm run preview  # serve dist/ locally

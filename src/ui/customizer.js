@@ -3,8 +3,8 @@
 
 import { OUTFITS, HEADGEAR, BUILDS, SKIN_TONES } from '../render/character.js';
 
-export const PRIMARY_COLORS = [0x2c4a6e, 0x1d1d26, 0x5a2a6e, 0x8a1f2f, 0x2f6f4f, 0xb89a6a, 0xf4f1ea, 0xe0662a, 0x2aa8c9, 0xd94f8a];
-export const ACCENT_COLORS = [0xffb347, 0x3ef0d0, 0xff3b30, 0xf4f1ea, 0x1d1d26, 0xffd12e, 0x8be04a, 0x7a5cff, 0xff7ad9, 0x5a6a78];
+export const PRIMARY_COLORS = [0x3d5266, 0x1a1a20, 0x3a2a4a, 0x5a1a22, 0x2a4a3a, 0x6e6046, 0xb8b2a6, 0x8a4a1c, 0x1f6a7a, 0x4a4f56];
+export const ACCENT_COLORS = [0xc1121f, 0xffb000, 0x19f0e0, 0xefe6d2, 0x1a1a20, 0x6a8a2a, 0x7a5cff, 0xd94f8a, 0x2a6fd0, 0x5a6a78];
 
 const ADJ = ['Quiet', 'Velvet', 'Sneaky', 'Damp', 'Polite', 'Beige', 'Tactical', 'Suspicious', 'Midnight', 'Squeaky', 'Humble', 'Greased', 'Invisible', 'Lukewarm', 'Discreet', 'Unbothered', 'Slippery', 'Whispering', 'Casual', 'Budget'];
 const NOUN = ['Otter', 'Baguette', 'Raccoon', 'Sock', 'Possum', 'Noodle', 'Mongoose', 'Crouton', 'Ferret', 'Pigeon', 'Gecko', 'Biscuit', 'Lemur', 'Turnip', 'Weasel', 'Pancake', 'Moth', 'Dumpling', 'Badger', 'Cabbage'];

@@ -13,8 +13,8 @@ import { FLOOR, WALL, COVER, cellAt, isFloor, DIRS4 } from './grid.js';
 import { buildTimeline, poseAt } from './patrol.js';
 import { canSee } from './stealth.js';
 import { solveTopology, solveStealth, SOLVER_PAD_RANGE, SOLVER_PAD_ANGLE } from './solver.js';
-import { THEMES, THEME_IDS } from './themes.js';
-import { pickLoot } from './loot.js';
+import { THEMES, THEME_IDS, venueName } from './themes.js';
+import { generateLoot } from './loot.js';
 
 const MIN_CHAMBER = 5;
 const COVER_SHAPES = [
@@ -63,7 +63,12 @@ export function generateRoom({ seed, level = 1, theme = null, mods = null }) {
     room.attempt = attempt;
     const coverKinds = THEMES[themeId].covers;
     for (const c of room.covers) if (c.kind !== 'pedestal') c.kind = rng.pick(coverKinds);
-    room.loot.item = pickLoot(themeRng, themeId).id;
+    // The target and the address are rolled from their own stream, so they
+    // depend only on the seed and theme, never on layout retries.
+    const flavour = new RNG(hashSeed(`${seed}|loot|${level}|${themeId}`));
+    room.loot.info = generateLoot(flavour, themeId);
+    room.loot.item = room.loot.info.id;
+    room.venue = venueName(themeId, flavour);
     if (!placeGuards(room, rng, level, m)) continue;
     return room;
   }

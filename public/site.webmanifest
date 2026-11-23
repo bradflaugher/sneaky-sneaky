@@ -4,8 +4,8 @@
   "description": "A weaponless 3D stealth heist: sneak, crouch, crawl vents and steal extremely silly treasure without ever being seen.",
   "start_url": "./",
   "display": "fullscreen",
-  "background_color": "#070b12",
-  "theme_color": "#070b12",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
       "src": "./favicon.svg",

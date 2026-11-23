@@ -22,7 +22,7 @@ export class Radar {
     this.ox = (S - room.w * scale) / 2;
     this.oy = (S - room.h * scale) / 2;
     const g = this.bg.getContext('2d');
-    g.fillStyle = '#03141a';
+    g.fillStyle = '#020607';
     g.fillRect(0, 0, S, S);
     g.strokeStyle = 'rgba(62,240,208,0.09)';
     g.lineWidth = 1;
@@ -116,7 +116,7 @@ export class Radar {
         g.fillText('z', X(gd.x) - s * 0.3, Y(gd.z) + s * 0.4);
         continue;
       }
-      const col = gd.alert ? '255,59,48' : gd.meter > 0.3 || gd.wary ? '255,179,71' : '62,240,255';
+      const col = gd.alert ? '255,31,47' : gd.meter > 0.3 || gd.wary ? '255,176,0' : '25,240,224';
       g.fillStyle = `rgba(${col},0.33)`;
       g.beginPath();
       g.moveTo(X(gd.x), Y(gd.z));
