@@ -384,8 +384,317 @@ export function wallTexture(name) {
 export function miscTexture(name) {
   return make(`misc:${name}`, 256, MISC[name]);
 }
-export function skylineTexture() {
-  return make('misc:skyline', 1024, MISC.skyline);
+
+// ------------------------------------------------------------------ illustrated backdrops
+// Wide painted panoramas wrapped around the horizon, plus the sea. These are
+// what you see past the walls: a harbour, a city, canyon mesas, a hall.
+
+function backdropCanvas(key, draw) {
+  if (cache.has(key)) return cache.get(key);
+  const c = document.createElement('canvas');
+  c.width = 2048;
+  c.height = 512;
+  const g = c.getContext('2d');
+  draw(g, c.width, c.height, new RNG(key));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  cache.set(key, t);
+  return t;
+}
+
+/** A jagged silhouette band along the bottom of the panorama. */
+function ridge(g, W, H, rng, base, rough, color, step = 40) {
+  g.fillStyle = color;
+  g.beginPath();
+  g.moveTo(0, H);
+  let y = base;
+  const first = y;
+  for (let x = 0; x <= W; x += step) {
+    y = Math.max(base - rough, Math.min(base + rough, y + rng.range(-rough * 0.45, rough * 0.45)));
+    g.lineTo(x, x + step > W ? first : y);
+  }
+  g.lineTo(W, H);
+  g.closePath();
+  g.fill();
+}
+
+const BACKDROPS = {
+  // moonlit harbour: hills, a town of warm windows, one lighthouse
+  harbor(g, W, H, rng) {
+    ridge(g, W, H, rng, H * 0.66, 40, '#141c44');
+    ridge(g, W, H, rng, H * 0.76, 26, '#0e1434', 30);
+    for (let i = 0; i < 70; i++) {
+      const x = rng.range(0, W);
+      const bw = rng.range(14, 40);
+      const bh = rng.range(14, 52);
+      g.fillStyle = '#0a0f2a';
+      g.fillRect(x, H * 0.86 - bh, bw, bh + 80);
+      g.fillStyle = rng.chance(0.75) ? '#ffc860' : '#ffe8b0';
+      for (let k = 0; k < 3; k++) if (rng.chance(0.6)) g.fillRect(x + rng.range(2, bw - 5), H * 0.86 - rng.range(4, bh - 4), 3, 4);
+    }
+    for (const lx of [W * 0.21, W * 0.71]) {
+      g.fillStyle = '#e8e2d2';
+      g.beginPath();
+      g.moveTo(lx - 9, H * 0.84);
+      g.lineTo(lx - 5, H * 0.52);
+      g.lineTo(lx + 5, H * 0.52);
+      g.lineTo(lx + 9, H * 0.84);
+      g.fill();
+      g.fillStyle = '#c0283a';
+      g.fillRect(lx - 7, H * 0.62, 14, 12);
+      g.fillRect(lx - 8, H * 0.74, 16, 12);
+      g.fillStyle = '#0a0f2a';
+      g.fillRect(lx - 8, H * 0.49, 16, 5);
+      const beam = g.createLinearGradient(lx, 0, lx + 380, 0);
+      beam.addColorStop(0, 'rgba(255,236,170,0.75)');
+      beam.addColorStop(1, 'rgba(255,236,170,0)');
+      g.fillStyle = beam;
+      g.beginPath();
+      g.moveTo(lx, H * 0.5);
+      g.lineTo(lx + 380, H * 0.4);
+      g.lineTo(lx + 380, H * 0.56);
+      g.fill();
+      g.fillStyle = '#fff2c0';
+      g.beginPath();
+      g.arc(lx, H * 0.5, 6, 0, 7);
+      g.fill();
+    }
+    g.fillStyle = '#080c24';
+    g.fillRect(0, H * 0.86, W, H);
+  },
+  // midnight city: three ranks of towers, lit windows, rooftop masts
+  city(g, W, H, rng) {
+    for (let layer = 0; layer < 3; layer++) {
+      let x = 0;
+      const shadeL = ['#1c2460', '#131a48', '#0a0e2c'][layer];
+      while (x < W) {
+        const bw = rng.range(36, 110) * (1 + layer * 0.25);
+        const bh = rng.range(H * 0.25, H * (0.86 - layer * 0.16));
+        g.fillStyle = shadeL;
+        g.fillRect(x, H - bh, bw, bh);
+        if (rng.chance(0.35)) g.fillRect(x + bw * 0.3, H - bh - rng.range(10, 34), bw * 0.4, 40);
+        if (rng.chance(0.3)) {
+          g.fillRect(x + bw / 2 - 1.5, H - bh - 46, 3, 46);
+          g.fillStyle = '#ff4a5a';
+          g.fillRect(x + bw / 2 - 2.5, H - bh - 50, 5, 5);
+        }
+        const cols = Math.floor(bw / 11);
+        for (let wy = H - bh + 10; wy < H - 8; wy += 15)
+          for (let k = 0; k < cols; k++) {
+            if (!rng.chance(0.3 + layer * 0.06)) continue;
+            g.fillStyle = rng.chance(0.7) ? '#ffcf70' : '#6fe0f0';
+            g.fillRect(x + 5 + k * 11, wy, 6, 8);
+          }
+        x += bw + rng.range(0, 12);
+      }
+    }
+  },
+  // twilight canyon: layered mesas with sun-caught rims
+  mesas(g, W, H, rng) {
+    const layers = [
+      [H * 0.52, '#5a3a8a', '#f09a4a'],
+      [H * 0.66, '#3a2668', '#c8683a'],
+      [H * 0.8, '#22164a', '#7a3a4a'],
+    ];
+    for (const [base, color, rim] of layers) {
+      g.beginPath();
+      g.moveTo(0, H);
+      let x = 0;
+      let y = base;
+      const y0 = y;
+      const pts = [];
+      while (x < W) {
+        const flat = rng.range(60, 220);
+        pts.push([x, y], [Math.min(W, x + flat), y]);
+        x += flat + rng.range(10, 30);
+        y = base + rng.range(-70, 46);
+      }
+      pts.push([W, y0]);
+      pts[0][1] = y0;
+      for (const [px, py] of pts) g.lineTo(px, py);
+      g.lineTo(W, H);
+      g.closePath();
+      g.fillStyle = color;
+      g.fill();
+      g.strokeStyle = rim;
+      g.lineWidth = 3;
+      g.beginPath();
+      pts.forEach(([px, py], i) => g[i ? 'lineTo' : 'moveTo'](px, py));
+      g.stroke();
+      g.strokeStyle = 'rgba(10,6,30,0.3)';
+      g.lineWidth = 2;
+      for (let i = 0; i < 60; i++) {
+        const hx = rng.range(0, W);
+        const hy = rng.range(base - 20, H);
+        g.beginPath();
+        g.moveTo(hx, hy);
+        g.lineTo(hx + rng.range(-6, 6), hy + rng.range(20, 60));
+        g.stroke();
+      }
+    }
+  },
+  // sub-level industrial hall: catwalks, glowing conduits, stencilled sectors
+  sublevel(g, W, H, rng) {
+    g.fillStyle = '#0a1e28';
+    g.fillRect(0, 0, W, H);
+    for (let x = 0; x < W; x += 128) {
+      g.fillStyle = '#0f2c38';
+      g.fillRect(x + 4, 0, 120, H);
+      g.fillStyle = '#081820';
+      g.fillRect(x, 0, 8, H);
+    }
+    for (let i = 0; i < 26; i++) {
+      const x = rng.range(0, W);
+      const w = rng.range(8, 22);
+      g.fillStyle = '#163a46';
+      g.fillRect(x, 0, w, H);
+      if (rng.chance(0.55)) {
+        const col = rng.chance(0.7) ? '79,232,192' : '79,200,240';
+        const gr = g.createLinearGradient(x - 14, 0, x + w + 14, 0);
+        gr.addColorStop(0, `rgba(${col},0)`);
+        gr.addColorStop(0.5, `rgba(${col},0.5)`);
+        gr.addColorStop(1, `rgba(${col},0)`);
+        g.fillStyle = gr;
+        g.fillRect(x - 14, 0, w + 28, H);
+        g.fillStyle = `rgba(${col},0.95)`;
+        g.fillRect(x + w / 2 - 1.5, 0, 3, H);
+      }
+    }
+    for (const y of [H * 0.34, H * 0.68]) {
+      g.fillStyle = '#06141a';
+      g.fillRect(0, y, W, 12);
+      g.strokeStyle = '#06141a';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(0, y - 34);
+      g.lineTo(W, y - 34);
+      for (let x = 0; x < W; x += 32) {
+        g.moveTo(x, y - 34);
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    g.fillStyle = 'rgba(240,194,58,0.6)';
+    g.font = '700 54px Bangers, Impact, sans-serif';
+    for (let i = 0; i < 4; i++) g.fillText(`SECTOR ${'ABCD'[i]}-${rng.int(2, 31)}`, i * (W / 4) + 60, H * 0.56);
+  },
+  // museum outer hall: colonnade and tall moonlit windows
+  hall(g, W, H, rng) {
+    g.fillStyle = '#150a22';
+    g.fillRect(0, 0, W, H);
+    for (let x = 0; x < W; x += 256) {
+      const gr = g.createLinearGradient(0, H * 0.1, 0, H);
+      gr.addColorStop(0, 'rgba(150,170,255,0.75)');
+      gr.addColorStop(1, 'rgba(80,60,160,0.2)');
+      g.fillStyle = gr;
+      g.beginPath();
+      g.moveTo(x + 78, H);
+      g.lineTo(x + 78, H * 0.34);
+      g.quadraticCurveTo(x + 128, H * 0.06, x + 178, H * 0.34);
+      g.lineTo(x + 178, H);
+      g.fill();
+      g.strokeStyle = '#150a22';
+      g.lineWidth = 5;
+      g.beginPath();
+      g.moveTo(x + 128, H * 0.1);
+      g.lineTo(x + 128, H);
+      for (const yy of [0.4, 0.6, 0.8]) {
+        g.moveTo(x + 78, H * yy);
+        g.lineTo(x + 178, H * yy);
+      }
+      g.stroke();
+      g.fillStyle = '#2a1840';
+      g.fillRect(x - 22, 0, 44, H);
+      g.fillStyle = '#e2b450';
+      g.fillRect(x - 28, H * 0.08, 56, 8);
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.fillRect(x + 6, 0, 16, H);
+      if (rng.chance(0.5)) {
+        g.fillStyle = '#7a1424';
+        g.fillRect(x + 196, H * 0.2, 40, H * 0.55);
+        g.fillStyle = '#e2b450';
+        g.fillRect(x + 196, H * 0.2, 40, 6);
+      }
+    }
+  },
+  // VR horizon: glow bands and receding verticals
+  vr(g, W, H) {
+    const gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, 'rgba(58,232,255,0)');
+    gr.addColorStop(0.72, 'rgba(58,232,255,0.1)');
+    gr.addColorStop(0.9, 'rgba(255,58,200,0.5)');
+    gr.addColorStop(1, 'rgba(58,232,255,0.9)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(58,232,255,0.5)';
+    for (let x = 0; x < W; x += 64) g.fillRect(x, H * 0.55, 2, H);
+    for (let i = 0; i < 6; i++) g.fillRect(0, H * (0.62 + i * 0.07), W, 2);
+    g.fillStyle = '#ff3ac8';
+    g.fillRect(0, H - 6, W, 6);
+  },
+};
+
+export function backdropTexture(kind) {
+  return backdropCanvas(`backdrop:${kind}`, BACKDROPS[kind]);
+}
+
+/** The city seen from the 88th floor: dark blocks, glowing streets, window specks. */
+export function cityBelowTexture() {
+  return make('citybelow', 512, (g, s, rng) => {
+    g.fillStyle = '#0a0e2a';
+    g.fillRect(0, 0, s, s);
+    const n = 4;
+    const t = s / n;
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        g.fillStyle = `rgb(${rng.int(16, 30)},${rng.int(22, 38)},${rng.int(60, 92)})`;
+        const pad = rng.range(10, 20);
+        g.fillRect(x * t + pad, y * t + pad, t - pad * 2, t - pad * 2);
+        for (let k = 0; k < 14; k++) {
+          g.fillStyle = rng.chance(0.7) ? 'rgba(255,207,112,0.9)' : 'rgba(111,224,240,0.9)';
+          g.fillRect(x * t + rng.range(pad + 3, t - pad - 6), y * t + rng.range(pad + 3, t - pad - 6), 3, 3);
+        }
+      }
+    for (let i = 0; i <= n; i++) {
+      const gr = g.createLinearGradient(i * t - 9, 0, i * t + 9, 0);
+      gr.addColorStop(0, 'rgba(255,170,70,0)');
+      gr.addColorStop(0.5, 'rgba(255,190,90,0.85)');
+      gr.addColorStop(1, 'rgba(255,170,70,0)');
+      g.fillStyle = gr;
+      g.fillRect(i * t - 9, 0, 18, s);
+      const gr2 = g.createLinearGradient(0, i * t - 9, 0, i * t + 9);
+      gr2.addColorStop(0, 'rgba(255,170,70,0)');
+      gr2.addColorStop(0.5, 'rgba(255,190,90,0.85)');
+      gr2.addColorStop(1, 'rgba(255,170,70,0)');
+      g.fillStyle = gr2;
+      g.fillRect(0, i * t - 9, s, 18);
+    }
+  });
+}
+
+/** Moonlit sea: a deep wash with inked wave crests and scattered glints. */
+export function oceanTexture() {
+  return make('ocean', 512, (g, s, rng) => {
+    const gr = g.createLinearGradient(0, 0, s, s);
+    gr.addColorStop(0, '#102a5a');
+    gr.addColorStop(1, '#0c2048');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, s, s);
+    g.lineCap = 'round';
+    for (let i = 0; i < 46; i++) {
+      const x = rng.range(0, s);
+      const y = rng.range(0, s);
+      const w = rng.range(18, 60);
+      g.strokeStyle = rng.chance(0.3) ? 'rgba(190,225,255,0.55)' : 'rgba(70,140,200,0.5)';
+      g.lineWidth = rng.range(1.5, 3);
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x + w / 2, y - w * 0.22, x + w, y);
+      g.stroke();
+    }
+  });
 }
 
 /** Soft radial glow sprite / light-pool decal (the one deliberately smooth texture). */
@@ -499,10 +808,10 @@ export function stampTexture(text, color, { burstColor = null, w = 128, h = 128 
     g.stroke();
   }
   let size = h * (burstColor ? 0.6 : 0.82);
-  g.font = `italic 900 ${size}px Bangers, "Marker Felt", "Chalkboard SE", "Comic Sans MS", Impact, "Arial Black", sans-serif`;
+  g.font = `400 ${size}px Bangers, Impact, "Arial Black", sans-serif`;
   const tw = g.measureText(text).width;
   if (tw > w * 0.84) size *= (w * 0.84) / tw;
-  g.font = `italic 900 ${size}px Bangers, "Marker Felt", "Chalkboard SE", "Comic Sans MS", Impact, "Arial Black", sans-serif`;
+  g.font = `400 ${size}px Bangers, Impact, "Arial Black", sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineJoin = 'round';

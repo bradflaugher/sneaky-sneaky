@@ -1,4 +1,4 @@
-// localStorage persistence: loot vault, stats, settings.
+// localStorage persistence: case files (completed missions), stats, settings.
 // (There is no character customisation: the thief is always the thief.)
 
 import { DEFAULT_SETUP, normalizeSetup } from '../core/difficulty.js';
@@ -67,7 +67,7 @@ export function recordLoot(save, loot, rank, ctx = {}) {
   let e = save.vault[loot.id];
   const isNew = !e;
   if (!e) {
-    e = { name: loot.name, rarity: loot.rarity, serial: loot.serial, tagline: loot.tagline, venue: ctx.venue || '', sector: ctx.sector || 0, theme: ctx.theme || '', count: 0, best: rank };
+    e = { name: loot.name, rarity: loot.rarity, serial: loot.serial, tagline: loot.tagline, verb: loot.mission ? loot.mission.past : 'RECOVERED', venue: ctx.venue || '', sector: ctx.sector || 0, theme: ctx.theme || '', count: 0, best: rank };
     save.vault[loot.id] = e;
   }
   e.count++;

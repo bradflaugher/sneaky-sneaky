@@ -399,6 +399,11 @@ function buildLayout(rng, level, m) {
     }
   }
 
+  // Every room, including the very first, has at least one vent and duct:
+  // try every chamber pair before giving up on this layout.
+  for (let i = 0; i < leaves.length && !room.vents.length; i++) for (let j = i + 1; j < leaves.length && !room.vents.length; j++) addVent(i, j);
+  if (!room.vents.length) return null;
+
   return room;
 }
 

@@ -1,12 +1,8 @@
 /* Sneaky Sneaky UI — a printed comic book.
    Cream paper panels, ink-black borders, hard offset shadows, Ben-Day dots,
-   yellow caption boxes and hand-lettered display type. During play the HUD
+   yellow caption boxes, Bangers for display lettering and Comic Neue for
+   captions (both self-hosted, see src/main.js). During play the HUD
    keeps to the corners so the artwork owns the frame. */
-@font-face {
-  font-family: 'Lettering';
-  src: local('Bangers'), local('Marker Felt Wide'), local('MarkerFelt-Wide'), local('Chalkboard SE Bold'), local('ChalkboardSE-Bold'), local('Comic Sans MS Bold'), local('ComicSansMS-Bold'), local('Comic Neue Bold'), local('Impact'),
-    local('Arial Black'), local('Roboto Black'), local('Arial Bold'), local('Liberation Sans Bold'), local('DejaVu Sans Bold'), local('Noto Sans Bold'), local('Roboto Bold');
-}
 :root {
   --ink: #0b0d12;
   --paper: #f6efdc;
@@ -23,7 +19,7 @@
   --sar: env(safe-area-inset-right, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
-  --display: 'Lettering', 'Comic Sans MS', 'Chalkboard SE', Impact, 'Arial Black', sans-serif;
+  --display: 'Bangers', Impact, 'Arial Black', sans-serif;
   --body: 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --dots: radial-gradient(rgba(11, 13, 18, 0.13) 1.1px, transparent 1.5px) 0 0 / 7px 7px;
   --dots-fade: linear-gradient(135deg, transparent 35%, rgba(11, 13, 18, 0.1));
@@ -428,6 +424,11 @@ body.touch #touch {
 .tbtn.big.ready.choke {
   background: var(--yellow);
   color: var(--ink);
+}
+/* long mission verbs (PHOTOGRAPH, RECALIBRATE) still fit the button */
+.tbtn.big.long {
+  font-size: 15px;
+  letter-spacing: 0;
 }
 @keyframes pop {
   50% {
@@ -1065,6 +1066,82 @@ h1 i {
   padding: 0 20px;
 }
 
+/* ------------------------------------------------------------ lettering
+   Bangers is a caps display face: lovely big, cramped small. Give it air, and
+   hand anything under ~12px to the caption face instead. */
+h1,
+h2,
+.btn,
+.chip,
+#obj-text,
+#banner-title,
+#clear-loot,
+.vault-item b,
+#loading-text,
+.tbtn,
+#prompt,
+#toast,
+#stats,
+.rank,
+.issue-badge b {
+  letter-spacing: 0.045em;
+}
+h1 {
+  letter-spacing: 0.02em;
+}
+#obj-text {
+  font-size: 18px;
+  line-height: 1.05;
+}
+.btn {
+  font-size: 21px;
+}
+.btn.primary {
+  font-size: 29px;
+}
+.chip {
+  font-size: 16px;
+}
+#room-tag,
+.radar-label,
+.stat-grid label,
+.meta-line,
+.got,
+.vault-item .meta,
+.vault-item .venue,
+.vault-item .rar,
+.setup-btn small,
+.field .lbl,
+.setup .chip small,
+.row.tiny,
+.cover-strip,
+.issue-badge,
+.panel-head,
+#banner-eyebrow,
+.badge,
+.tuning summary,
+.slider-head,
+#stick-hint,
+#keys-hint b,
+kbd {
+  font-family: var(--body);
+  font-weight: 700;
+}
+.panel-head,
+#banner-eyebrow,
+.cover-strip {
+  font-size: 12px;
+}
+.tbtn {
+  font-size: 14px;
+}
+.tbtn.big {
+  font-size: 22px;
+}
+.tbtn.small {
+  font-size: 13px;
+}
+
 /* ------------------------------------------------------------ responsive */
 @media (orientation: portrait) {
   #screen-title {
@@ -1155,12 +1232,21 @@ h1 i {
   .tbtn.big {
     width: 82px;
     height: 82px;
-    font-size: 15px;
+    font-size: 19px;
   }
   .tbtn {
     width: 58px;
     height: 58px;
-    font-size: 11px;
+    font-size: 12.5px;
+  }
+  .btn {
+    font-size: 17px;
+  }
+  .btn.primary {
+    font-size: 22px;
+  }
+  #obj-text {
+    font-size: 15px;
   }
   #btn-crouch {
     right: calc(var(--r) + 94px);

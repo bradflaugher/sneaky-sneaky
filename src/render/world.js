@@ -6,10 +6,11 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { WALL, cellAt } from '../core/grid.js';
 import { RNG } from '../core/rng.js';
 import { ART, VENT_COLORS, WALL_H } from './themeArt.js';
-import { floorTexture, wallTexture, miscTexture, skylineTexture, skyTexture, glowTexture, poolTexture, shaftTexture, paintedTexture } from './textures.js';
+import { floorTexture, wallTexture, miscTexture, skyTexture, glowTexture, poolTexture, shaftTexture, paintedTexture, backdropTexture, oceanTexture, cityBelowTexture } from './textures.js';
 import { toon, glowToon, inkAll } from './toon.js';
 import { buildLootProp } from './lootProps.js';
 import { LOOT_BY_ID } from '../core/loot.js';
+import { ductPath } from '../core/ducts.js';
 
 // Everything solid is cel-shaded and flat-faceted (see toon.js).
 const std = (color, o = {}) => toon(color, o);
@@ -109,9 +110,44 @@ export function buildWorld(room, { lowPower = false } = {}) {
     m.position.set(w / 2, y, h / 2);
     return m;
   };
+  /** An illustrated panorama wrapped round the horizon. */
+  const backdrop = (kind, radius, height, baseY, repeat = 2, opacity = 1) => {
+    const tex = backdropTexture(kind).clone();
+    tex.repeat.set(repeat, 1);
+    tex.needsUpdate = true;
+    disposables.push(tex);
+    const geo = new THREE.CylinderGeometry(radius, radius, height, 64, 1, true);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity, side: THREE.BackSide, fog: false, depthWrite: false }));
+    m.position.set(w / 2, baseY + height / 2, h / 2);
+    m.renderOrder = -5;
+    group.add(m);
+    disposables.push(geo);
+    return m;
+  };
+  /** A soft moon with a halo, hung in the sky. */
+  const moon = (x, y, z, size, color = 0xdfe8ff) => {
+    for (const [k, o] of [
+      [1, 0.95],
+      [3.2, 0.3],
+    ]) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, opacity: o, fog: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+      sp.position.set(w / 2 + x, y, h / 2 + z);
+      sp.scale.setScalar(size * k);
+      sp.renderOrder = -6;
+      group.add(sp);
+    }
+  };
+  const reach = Math.max(w, h);
+
   if (art.env === 'ocean') {
-    const sea = ground(new THREE.MeshBasicMaterial({ color: 0x0a1a3a }), -2.4);
+    // a moonlit sea with inked wave crests, drifting slowly past the hull
+    const seaTex = oceanTexture().clone();
+    seaTex.repeat.set(70, 70);
+    seaTex.needsUpdate = true;
+    disposables.push(seaTex);
+    const sea = ground(new THREE.MeshBasicMaterial({ map: seaTex, color: 0xb8c8e8 }), -2.4);
     sea.receiveShadow = false;
+    animated.push((t) => seaTex.offset.set(t * 0.012, t * 0.007));
     const hullM = std(0xe8e0cc);
     mesh(new THREE.BoxGeometry(w + 3, 2.6, h + 3), hullM).position.set(w / 2, -1.32, h / 2);
     const bow = mesh(new THREE.CylinderGeometry((h + 3) / 2 / Math.cos(Math.PI / 4) / 1.4142, (h + 3) / 2.4, 2.6, 4, 1), hullM);
@@ -119,54 +155,99 @@ export function buildWorld(room, { lowPower = false } = {}) {
     bow.scale.set(1.5, 1, 1);
     bow.position.set(w + 1.5, -1.32, h / 2);
     mesh(new THREE.BoxGeometry(w + 3.1, 0.25, h + 3.1), std(0x7a4020)).position.set(w / 2, -1.4, h / 2);
-    for (let i = 0; i < 26; i++) {
-      const s = decal(0xffa238, rng.range(3, 9), w / 2 - rng.range(20, 120), h / 2 + rng.range(-70, 70), 0.25, -2.38);
-      s.scale.y = 0.18;
-      animated.push((t) => (s.material.opacity = 0.05 + 0.07 * Math.max(0, Math.sin(t * 1.3 + i))));
+    // the moon and its long shimmering path on the water
+    moon(-64, 30, -40, 10);
+    for (let i = 0; i < 30; i++) {
+      const k = i / 30;
+      const s = decal(0xdfe8ff, rng.range(5, 12), w / 2 - 14 - k * 96 + rng.range(-3, 3), h / 2 - 9 - k * 61 + rng.range(-4, 4), 0.3, -2.37);
+      s.scale.y = 0.14;
+      s.rotation.z = 0.55;
+      animated.push((t) => (s.material.opacity = 0.1 + 0.2 * Math.max(0, Math.sin(t * 1.6 + i * 1.7))));
     }
+    backdrop('harbor', reach * 0.5 + 36, 22, -5, 2);
   } else if (art.env === 'skyline') {
-    const tex = skylineTexture();
-    tex.repeat.set(5, 1);
-    const cylGeo = new THREE.CylinderGeometry(140, 140, 110, 48, 1, true);
-    const sk = new THREE.Mesh(cylGeo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.BackSide, fog: false, depthWrite: false }));
-    sk.position.set(w / 2, -22, h / 2);
-    sk.renderOrder = -5;
-    group.add(sk);
-    disposables.push(cylGeo);
+    // midnight city on every side, a hazy moon above it
+    backdrop('city', 190, 120, -52, 2, 0.75);
+    backdrop('city', reach * 0.5 + 70, 70, -44, 3);
+    moon(50, 40, -80, 14, 0xe8e0ff);
+    // the streets far below: blocks, lit windows, rivers of amber traffic
+    const below = cityBelowTexture().clone();
+    below.repeat.set(9, 9);
+    below.needsUpdate = true;
+    disposables.push(below);
+    ground(new THREE.MeshBasicMaterial({ map: below, color: 0x5a5f8c, fog: false }), -70, 900).receiveShadow = false;
     mesh(new THREE.BoxGeometry(w + 0.6, 60, h + 0.6), std(0x05060c), group, false).position.set(w / 2, -30.06, h / 2);
   } else if (art.env === 'desert') {
-    const tex = miscTexture('sand');
-    const m = std(0xffffff, { map: tex.clone(), roughness: 1 });
-    m.map.repeat.set(60, 60);
-    m.map.needsUpdate = true;
-    ground(m, -0.04);
+    // dusk sand running out to the canyon walls
+    ground(std(0x54384e), -0.04);
     for (let i = 0; i < 16; i++) {
       const a = rng.range(0, Math.PI * 2);
-      const d = rng.range(Math.max(w, h) * 0.75 + 6, 70);
-      const dune = mesh(new THREE.SphereGeometry(1, 24, 12), std(0x3a2a52), group, false);
+      const d = rng.range(reach * 0.75 + 6, reach * 0.5 + 30);
+      const dune = mesh(new THREE.SphereGeometry(1, 24, 12), std(0x6e4658), group, false);
       dune.scale.set(rng.range(6, 16), rng.range(1.2, 4), rng.range(5, 12));
       dune.position.set(w / 2 + Math.cos(a) * d, -0.3, h / 2 + Math.sin(a) * d);
       dune.rotation.y = rng.range(0, 3);
     }
+    // canyon mesas all round, catching the last of the sun
+    backdrop('mesas', reach * 0.5 + 34, 26, -3, 2);
+    moon(60, 36, 50, 6, 0xfff0d0);
   } else if (art.env === 'vrgrid') {
     const tex = floorTexture('vrgrid').clone();
     tex.repeat.set(125, 125);
     tex.needsUpdate = true;
-    ground(new THREE.MeshBasicMaterial({ map: tex, color: 0x3a6a6a }), -0.03);
-    const lm = new THREE.LineBasicMaterial({ color: 0x3cffe1, transparent: true, opacity: 0.55 });
-    for (let i = 0; i < 18; i++) {
+    ground(new THREE.MeshBasicMaterial({ map: tex, color: 0x4a6a9a }), -0.03);
+    backdrop('vr', reach * 0.5 + 36, 24, -0.5, 3);
+    // floating holo-markers drifting over the grid
+    const cols = [0x3ae8ff, 0xff3ac8];
+    for (let i = 0; i < 22; i++) {
       const a = rng.range(0, Math.PI * 2);
-      const d = rng.range(Math.max(w, h) * 0.7 + 5, 60);
+      const d = rng.range(reach * 0.7 + 5, 64);
       const bx = new THREE.BoxGeometry(rng.range(2, 5), rng.range(4, 22), rng.range(2, 5));
-      const e = new THREE.LineSegments(new THREE.EdgesGeometry(bx), lm);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(bx), new THREE.LineBasicMaterial({ color: cols[i % 5 === 0 ? 1 : 0], transparent: true, opacity: 0.6 }));
       bx.dispose();
-      e.position.set(w / 2 + Math.cos(a) * d, rng.range(2, 9), h / 2 + Math.sin(a) * d);
+      const y0 = rng.range(2, 9);
+      e.position.set(w / 2 + Math.cos(a) * d, y0, h / 2 + Math.sin(a) * d);
       group.add(e);
       disposables.push(e.geometry);
-      animated.push((t) => (e.position.y += Math.sin(t * 0.4 + i) * 0.002));
+      animated.push((t) => {
+        e.position.y = y0 + Math.sin(t * 0.4 + i) * 0.6;
+        e.rotation.y = t * 0.05 * (i % 2 ? 1 : -1);
+      });
     }
   } else {
-    ground(std(new THREE.Color(art.fog[0]).multiplyScalar(0.7).getHex(), { roughness: 1 }), -0.05);
+    // an interior: the room sits inside a much bigger hall
+    const lab = room.themeId === 'lab';
+    // the same flooring runs on into the dark beyond the walls
+    const outer = floorTexture(art.floor).clone();
+    outer.repeat.set(125, 125);
+    outer.needsUpdate = true;
+    disposables.push(outer);
+    ground(new THREE.MeshStandardMaterial({ map: outer, color: lab ? 0x6f8a90 : 0x7a6a8a, roughness: 0.6 }), -0.05);
+    const hall = backdrop(lab ? 'sublevel' : 'hall', reach * 0.62 + 20, 30, -7, lab ? 3 : 4, lab ? 0.9 : 0.8);
+    hall.material.fog = true;
+    if (lab) {
+      // glowing conduit pipes rising out of the dark, and mist along the floor
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + 0.3;
+        const d = reach * 0.62 + rng.range(5, 12);
+        const col = i % 3 === 0 ? 0x4fc8f0 : 0x4fe8c0;
+        const pipe = mesh(new THREE.CylinderGeometry(0.22, 0.22, 16, 12), glowMat(col, 1.4), group, false);
+        pipe.position.set(w / 2 + Math.cos(a) * d, 6, h / 2 + Math.sin(a) * d * 0.8);
+        const collar = mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.5, 12), std(0x1c3038), group, false);
+        collar.position.set(pipe.position.x, 0.25, pipe.position.z);
+        decal(col, 7, pipe.position.x, pipe.position.z, 0.22);
+      }
+      for (let i = 0; i < 14; i++) {
+        const a = rng.range(0, Math.PI * 2);
+        const d = reach * 0.5 + rng.range(2, 14);
+        const mist = decal(0x9fe8e0, rng.range(10, 18), w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d * 0.8, 0.07, 0.3);
+        const x0 = mist.position.x;
+        animated.push((t) => {
+          mist.position.x = x0 + Math.sin(t * 0.12 + i) * 2.5;
+          mist.material.opacity = 0.05 + 0.03 * Math.sin(t * 0.3 + i * 2);
+        });
+      }
+    }
   }
 
   // ------------------------------------------------------------ floor
@@ -204,6 +285,9 @@ export function buildWorld(room, { lowPower = false } = {}) {
   }
   merged(wallGeos, wallMat);
   merged(capGeos, capMat, false);
+  // skirting trim where wall meets floor
+  const skirtGeos = rectsOf(room, (x, y) => room.cells[y * w + x] === WALL && !isBorder(x, y)).map((r) => new THREE.BoxGeometry(r.w + 0.07, 0.13, r.h + 0.07).translate(r.x + r.w / 2, 0.065, r.y + r.h / 2));
+  merged(skirtGeos, capMat, false);
 
   // The four outer walls are separate groups so whichever ones stand between
   // the camera and the room can sink out of the way (dollhouse cutaway).
@@ -549,7 +633,15 @@ export function buildWorld(room, { lowPower = false } = {}) {
           const p = (geo, mat, sx, sy, sz, px, py, pz, sh = false) => part(d, geo, mat, sx, sy, sz, px, py, pz, sh);
           const t = room.themeId;
           const roll = rng.next();
-          if (t === 'museum' || (t === 'office' && roll < 0.5)) {
+          if (t === 'museum' && roll > 0.72) {
+            // a hanging tapestry: deep colour, gold bands, a tasselled hem
+            const col = rng.pick([0x9a1426, 0x4a2a7a, 0x1f5a4a]);
+            p(unitBox, M.gold, 0.74, 0.06, 0.06, 0, 2.02, 0.05);
+            p(unitBox, std(col), 0.66, 1.45, 0.03, 0, 1.28, 0.045);
+            p(unitBox, M.gold, 0.66, 0.05, 0.035, 0, 1.75, 0.05);
+            p(unitBox, M.gold, 0.66, 0.05, 0.035, 0, 0.72, 0.05);
+            p(unitSph, M.gold, 0.2, 0.2, 0.04, 0, 1.25, 0.065);
+          } else if (t === 'museum' || (t === 'office' && roll < 0.5)) {
             const pw = rng.range(0.5, 0.85);
             const phh = rng.range(0.5, 0.85);
             p(unitBox, t === 'museum' ? M.gold : M.darkmetal, pw + 0.12, phh + 0.12, 0.05, 0, 1.55, 0.03);
@@ -689,6 +781,43 @@ export function buildWorld(room, { lowPower = false } = {}) {
     lootBeam.material.opacity = 0.06 + Math.sin(t * 3) * 0.025;
   });
 
+  // museum: velvet rope stanchions round the prize
+  if (room.themeId === 'museum') {
+    const posts = [
+      [-0.46, -0.46],
+      [0.46, -0.46],
+      [0.46, 0.46],
+      [-0.46, 0.46],
+    ];
+    posts.forEach(([px, pz], i) => {
+      part(group, unitCyl, M.gold, 0.05, 0.82, 0.05, room.loot.x + px, 0.41, room.loot.z + pz);
+      part(group, unitSph, M.gold, 0.1, 0.1, 0.1, room.loot.x + px, 0.86, room.loot.z + pz, false);
+      const [qx, qz] = posts[(i + 1) % 4];
+      const horiz = px !== qx;
+      part(group, unitBox, M.velvet, horiz ? 0.92 : 0.035, 0.035, horiz ? 0.035 : 0.92, room.loot.x + (px + qx) / 2, 0.72, room.loot.z + (pz + qz) / 2, false);
+    });
+  }
+
+  // moonlight through tall windows, thrown across the floor as window panes
+  if (room.themeId === 'museum' || room.themeId === 'office') {
+    const panes = paintedTexture('skylight', (g, sz) => {
+      g.clearRect(0, 0, sz, sz);
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      for (let yy = 0; yy < 3; yy++) for (let xx = 0; xx < 2; xx++) g.fillRect(xx * (sz / 2) + 5, yy * (sz / 3) + 5, sz / 2 - 10, sz / 3 - 10);
+    }, 128);
+    for (const c of room.chambers) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4.2), additive(room.themeId === 'museum' ? 0xb8c0ff : 0x9fd8ff, 0.07, panes));
+      m.rotation.x = -Math.PI / 2;
+      m.rotation.z = 0.5;
+      m.scale.x = 1.5; // sheared like a low moon
+      m.position.set(c.x + c.w * rng.range(0.3, 0.7), 0.024, c.y + c.h * rng.range(0.3, 0.7));
+      m.renderOrder = 2;
+      group.add(m);
+      const ph = rng.range(0, 6);
+      animated.push((t) => (m.material.opacity = 0.065 + 0.02 * Math.sin(t * 0.5 + ph)));
+    }
+  }
+
   // ------------------------------------------------------------ extraction pad
   const pad = new THREE.Group();
   pad.position.set(room.exit.x, 0, room.exit.z);
@@ -722,6 +851,10 @@ export function buildWorld(room, { lowPower = false } = {}) {
 
   // ------------------------------------------------------------ vents
   const ductM = std(0xffffff, { map: miscTexture('metal') });
+  const DUCT_Y = WALL_H + 0.36;
+  const DUCT_W = 0.36;
+  const DUCT_H = 0.26;
+  const ducts = [];
   room.vents.forEach((v, vi) => {
     const col = VENT_COLORS[vi % VENT_COLORS.length];
     const gm = glowMat(col, 1.8);
@@ -740,13 +873,65 @@ export function buildWorld(room, { lowPower = false } = {}) {
       const low = !solidOuter && isBorder(e.cx + e.dx, e.cy + e.dy);
       if (!low) {
         // a stub of ducting climbing the wall above the grate
-        part(g, unitBox, ductM, 0.4, WALL_H - 0.72, 0.1, 0, 0.72 + (WALL_H - 0.72) / 2, 0.0);
-        part(g, unitBox, stripM, 0.05, WALL_H - 0.72, 0.02, 0, 0.72 + (WALL_H - 0.72) / 2, 0.055, false);
+        // the riser: ducting climbing the wall from the grate up to the overhead run
+        part(g, unitBox, ductM, 0.36, WALL_H + 0.36 - 0.72, 0.14, 0, 0.72 + (WALL_H + 0.36 - 0.72) / 2, 0.02);
+        part(g, unitBox, stripM, 0.05, WALL_H + 0.36 - 0.72, 0.02, 0, 0.72 + (WALL_H + 0.36 - 0.72) / 2, 0.095, false);
       }
       const pool = decal(col, 1.9, e.cx + 0.5, e.cy + 0.5, 0.5);
       animated.push((t) => (pool.material.opacity = 0.4 + Math.sin(t * 2.5 + vi) * 0.12));
     });
+
+    // The duct itself: brushed steel, ribbed, flanged at every joint, with the
+    // vent's colour running along the top. It follows ductPath(), the same
+    // route the crawl takes. Each run fades out whenever it would come between
+    // the camera and the agent, so it never hides the action.
+    const steel = std(0xc8d0d8, { map: miscTexture('metal'), transparent: true });
+    const flange = std(0x8a929c, { transparent: true });
+    const stripe = glowMat(col, 1.1);
+    stripe.transparent = true;
+    const mats = [steel, flange, stripe];
+    const pts = ductPath(room, v).points;
+    const runs = [];
+    for (let i = 1; i < pts.length; i++) {
+      const p0 = pts[i - 1];
+      const p1 = pts[i];
+      const len = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+      if (len < 0.05) continue;
+      const alongX = Math.abs(p1.x - p0.x) > Math.abs(p1.z - p0.z);
+      const cx = (p0.x + p1.x) / 2;
+      const cz = (p0.z + p1.z) / 2;
+      const box = (mat, l, hgt, wid, along, y) => part(group, unitBox, mat, alongX ? l : wid, hgt, alongX ? wid : l, alongX ? cx + along : cx, y, alongX ? cz : cz + along, false);
+      box(steel, len + DUCT_W, DUCT_H, DUCT_W, 0, DUCT_Y);
+      box(stripe, len + DUCT_W, 0.02, 0.07, 0, DUCT_Y + DUCT_H / 2 + 0.008);
+      for (let d = -len / 2 + 0.35; d < len / 2 - 0.2; d += 0.7) box(flange, 0.05, DUCT_H + 0.035, DUCT_W + 0.035, d, DUCT_Y); // ribs
+      runs.push({ x0: Math.min(p0.x, p1.x) - DUCT_W, x1: Math.max(p0.x, p1.x) + DUCT_W, z0: Math.min(p0.z, p1.z) - DUCT_W, z1: Math.max(p0.z, p1.z) + DUCT_W });
+    }
+    // riveted flange collars at both ends and at the elbow
+    for (const q of pts) {
+      part(group, unitBox, flange, DUCT_W + 0.14, DUCT_H + 0.12, DUCT_W + 0.14, q.x, DUCT_Y, q.z, false);
+      for (const [rx, rz] of [
+        [1, 1],
+        [-1, 1],
+        [1, -1],
+        [-1, -1],
+      ])
+        part(group, unitSph, steel, 0.045, 0.045, 0.045, q.x + rx * (DUCT_W / 2 + 0.035), DUCT_Y + DUCT_H / 2 + 0.06, q.z + rz * (DUCT_W / 2 + 0.035), false);
+    }
+    ducts.push({ mats, runs, fade: 1 });
   });
+
+  // the glowing pulse that shows the agent crawling through a duct
+  const pulse = new THREE.Group();
+  pulse.visible = false;
+  {
+    const core = new THREE.Mesh(unitSph, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    core.scale.setScalar(0.22);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
+    halo.scale.setScalar(1.7);
+    pulse.add(core, halo);
+    pulse.renderOrder = 30;
+    group.add(pulse);
+  }
 
   // ------------------------------------------------------------ arched doorways
   {
@@ -829,8 +1014,23 @@ export function buildWorld(room, { lowPower = false } = {}) {
   return {
     group,
     art,
-    update(t, dt, camPos) {
+    /** focus: the agent's position {x, z}; ducts between it and the camera fade away. */
+    update(t, dt, camPos, focus = null) {
       for (const f of animated) f(t, dt);
+      for (const d of ducts) {
+        let blocking = false;
+        if (camPos && focus && camPos.y > DUCT_Y + 0.5) {
+          // where the sight line from the agent to the camera crosses duct height
+          for (const yy of [0.2, 1.0, 1.8]) {
+            const k = (DUCT_Y - yy) / (camPos.y - yy);
+            const sx = focus.x + (camPos.x - focus.x) * k;
+            const sz = focus.z + (camPos.z - focus.z) * k;
+            for (const r of d.runs) if (sx > r.x0 - 0.35 && sx < r.x1 + 0.35 && sz > r.z0 - 0.35 && sz < r.z1 + 0.35) blocking = true;
+          }
+        }
+        d.fade += ((blocking ? 0.14 : 1) - d.fade) * (1 - Math.exp(-12 * dt));
+        for (const m of d.mats) m.opacity = d.fade;
+      }
       for (const side of sides) {
         if (side.low) continue;
         const want = camPos && side.hidden(camPos) ? -(WALL_H - 0.4) : 0;
@@ -847,8 +1047,18 @@ export function buildWorld(room, { lowPower = false } = {}) {
       }
       moteGeo.attributes.position.needsUpdate = true;
     },
-    setLootTaken(taken) {
-      loot.visible = lootBeam.visible = lootGlow.visible = lootLight.visible = !taken;
+    /** `keep`: the mission left the object in place (photographed, scanned, swapped...). */
+    setLootTaken(taken, keep = false) {
+      loot.visible = !taken || keep;
+      lootBeam.visible = lootGlow.visible = lootLight.visible = !taken;
+    },
+    /** Show the crawl pulse inside the ductwork at (x, z), or hide it with null. */
+    setVentPulse(pos, color = 0xffffff) {
+      pulse.visible = !!pos;
+      if (!pos) return;
+      pulse.position.set(pos.x, DUCT_Y, pos.z);
+      pulse.children[0].material.color.setHex(color);
+      pulse.children[1].material.color.setHex(color);
     },
     setExitActive(on) {
       exitActive = on;

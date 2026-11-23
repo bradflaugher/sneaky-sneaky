@@ -3,23 +3,34 @@
 **[sneakysneaky.win](https://sneakysneaky.win/)**
 
 <p align="center">
-  <img src="docs/gameplay.gif" width="100%" alt="Sneaky Sneaky gameplay: an all-black phantom thief sneaking through comic-book HD-2D superyachts, midnight museums, and secret science labs with Ben-Day halftone lighting, crouching behind cover, knocking to distract guards, and stealing procedurally generated heist targets.">
+  <img src="docs/gameplay.gif" width="100%" alt="Sneaky Sneaky gameplay: an all-black pacifist agent sneaking through comic-book HD-2D superyachts, midnight museums, and secret science labs with Ben-Day halftone lighting, crouching behind cover, knocking to distract guards, and completing procedurally generated spy missions.">
 </p>
 
 A weaponless, pacifist HD-2D comic-book stealth puzzle game for the browser, with proper
 desktop controls and portrait + landscape phone controls.
 
-No weapons, ever. Sneak past guards, crouch behind cover, crawl vents, knock
-to distract, put the occasional guard to sleep, and steal extremely silly
-treasure. If a guard's vision cone fills up, the `!` pops and the mission is
+No weapons, ever. You are a pacifist spy on a string of very silly
+assignments: photograph it, decrypt it, rescue it, swap it, verify it. Sneak
+past guards, crouch behind cover, crawl the ductwork, knock to distract and
+put the occasional guard to sleep. If a guard's vision cone fills up, the `!` pops and the mission is
 over — one tap (or `R` / `Space`) and you're back at the start of the room.
 
 Everything is procedural: rooms, guards, textures, characters, loot props and
 sound. There are no downloaded assets.
 
-## Infinite loot and venues
+## Infinite missions and venues
 
-Every room rolls its own heist target and its own address from the seed.
+Every room rolls its own mission, target and address from the seed.
+
+- **Missions** pair a verb with the target, in three pacifist categories:
+  **Intel / Recon** (`PHOTOGRAPH`, `COPY`, `DECRYPT`, `SCAN`), **Recovery /
+  Rescue** (`RETRIEVE`, `RESCUE`, `RECOVER`, `RETURN`) and **Tinker / Swap**
+  (`SWAP`, `RECALIBRATE`, `VERIFY`, `INSPECT`). Objects lean towards jobs that
+  suit them (you decrypt a floppy disk, you rescue a porcelain frog). The verb
+  shows in the objective, on the action button and prompt, and in your case
+  files. Recoveries leave with the object; intel and tinker jobs leave it on
+  its pedestal. Mechanically it is always: sneak to the target, interact,
+  reach the extraction pad.
 
 - **Targets** are assembled from word banks as
   `[Owner] [Adjective] [Material] [Object] [(Tag)]`, for example *The
@@ -37,8 +48,8 @@ Every room rolls its own heist target and its own address from the seed.
 - **Venues** are generated the same way: *M/Y Quiet Money VII · Tender
   Garage*, *Ledger Tower · Floor 97 (Executive Wing)*, *Sub-Level 22 ·
   Condemned Containment D*, *VR Simulation 0x9F · Ghost Protocol 07*.
-- The **Loot Vault** files every unique artifact with its venue, sector,
-  rarity, serial and best rank. It filters by rarity, pages 36 at a time, and
+- **Case Files** records every unique mission target with what you did to
+  it, its venue, sector, rarity, serial and best rank. It filters by rarity, pages 36 at a time, and
   keeps the newest 500 unique items (signature pieces are never evicted).
 
 Difficulty never changes the prize: target and venue depend only on the seed
@@ -48,7 +59,7 @@ and theme.
 
 **The thief** is one fixed figure: an anonymous burglar in matte black from
 mask to boots, with slate-blue comic rim light. No name, no face, no
-customisation; pressing **START HEIST** goes straight into the heist.
+customisation; pressing **START MISSION** goes straight in.
 
 **Guards** are procedurally generated per room from five comic archetypes,
 weighted by setting, each with randomised build, skin tone, hair, headwear,
@@ -56,11 +67,11 @@ eyewear, facial hair, scarf, badge, uniform colours and hand prop:
 
 | Archetype | Look | Mostly found |
 | --- | --- | --- |
-| Heavy Enforcer | broad bruiser in a coat or vest, shades, flashlight or baton | yacht, bunker |
-| Night Watchman | rumpled uniform, peaked cap, thermos or keys, a bit of a belly | office, museum |
-| Tech Specialist | visor helmet or headset, utility vest, glowing scanner | lab, VR |
-| Gala Security | tailored blazer and tie, earpiece, slick hair or fedora | yacht, museum |
-| Tactical Officer | greatcoat or field jacket, beret, epaulettes, radio | bunker |
+| Heavy Enforcer | broad bruiser in an open coat with sharp lapels, shades, flashlight | yacht, bunker |
+| Night Watchman | rumpled uniform, tilted peaked cap, steaming mug or keys, weary eyes | office, museum |
+| Tech Specialist | visor helmet or headset, collar tubing, shoulder beacon, glowing scanner | lab, VR |
+| Gala Security | tailored blazer, shirt and tie, coiled earpiece, slick hair or fedora | yacht, museum |
+| Tactical Officer | long greatcoat with a popped collar, beret, epaulettes, stern brow | bunker |
 
 The definitions live in `src/core/cast.js` and are unit tested.
 
@@ -69,18 +80,32 @@ The definitions live in `src/core/cast.js` and are unit tested.
 A hyper-modern graphic novel in HD-2D: hand-inked 2D comic characters standing
 in a smooth, lit 3D diorama.
 
+- **Lettering** is real comic type, self-hosted and bundled by Vite with no
+  external requests: Bangers for titles, buttons, bursts and the in-world
+  onomatopoeia, Comic Neue for captions and small labels (both SIL OFL, via
+  `@fontsource`).
 - **Characters are 2D illustrations**, not 3D models. `src/render/sprites.js`
   poses a small skeleton (six-frame walk cycle, prowling crouch, sleeper hold,
   startled recoil, look-around, asleep on the floor), projects it from one of
   five view angles (front, 3/4, profile, 3/4 back, back; mirrored for the other
   side) and draws over it in Canvas2D: variable-weight ink, flat colour, a cel
-  fold, a rim highlight and Ben-Day dots. Frames are drawn on demand at
-  512 px (thief) or 384 px (guards) and cached.
+  fold, creases at bent joints, shadow hatching, a bright rim-light stroke
+  along the lit silhouette edge and Ben-Day dots. Nobody stands like a
+  mannequin: idle poses carry weight on one leg with soft elbows and knees,
+  and the thief stays coiled. Frames are drawn on demand at 512 px (thief) or
+  384 px (guards) and cached.
 - **Standees in 3D** (`src/render/character.js`): each character is a
   camera-facing plane that picks its view from the angle between its heading
   and the camera, leans back as the camera climbs, casts a real alpha-tested
   shadow and sits on a soft contact shadow. Behind scenery it shows as a flat
   silhouette.
+- **Illustrated surroundings**: a moonlit sea with inked wave crests, a moon
+  path and a harbour town with lighthouses (yacht); the city on every side and
+  lit streets far below (office); a sub-level hall of glowing conduits,
+  catwalks, stencilled sectors and floor mist (lab); twilight sand, dunes and
+  canyon mesas (bunker); a colonnaded hall with moonlit windows, plus
+  tapestries, rope stanchions round the prize and window-pane moonlight across
+  the marble (museum); a glowing horizon and drifting holo-markers (VR).
 - **The diorama** is smooth and modern: bevelled furniture, round rails and
   pods, arched doorways, cel-shaded materials, high-resolution painted
   textures with linear and anisotropic filtering. Nothing is pixelated.
@@ -134,10 +159,15 @@ npm run dev        # http://localhost:5173
 - **Sleeper hold.** Get close, directly behind a guard, and take the prompt.
   A guard who spots a sleeping colleague walks over and wakes them up.
 - **Knock** sends guards in earshot to investigate where you were standing.
-- **Vents** link two grates of the same colour. **Lasers** need their wall
+- **Vents and ductwork.** Every vent pair is joined by a visible steel duct
+  running overhead, colour-striped to match its grates, so you can read where
+  a vent comes out before you use it. Crawling follows the real duct: a
+  glowing pulse (and the camera) travels along it and you drop out crouched
+  at the far grate. Ducts fade whenever they would cover the agent, and every
+  room, including the first, has at least one. **Lasers** need their wall
   switch, or a vent around them.
 - **Rank** (S / A / B) comes from time against the ghost par, knockouts and
-  close calls. Zero knockouts earns the Ghost Bonus. Loot goes in the Vault.
+  close calls. Zero knockouts earns the Ghost Bonus. Cleared missions go in Case Files.
 
 ### Difficulty and the endless ramp
 
@@ -227,7 +257,8 @@ src/core/             pure logic, no three.js, unit tested
   generator.js        room generator
   difficulty.js       presets, ramp maths, shareable setup params
   themes.js           the six settings and the venue-name generator
-  loot.js             signature items and the procedural loot engine
+  loot.js             mission targets, mission verbs, signature items
+  ducts.js            duct routing and the crawl path
 src/render/           three.js: 2D comic sprite illustrator, standee rigs, painted
                       textures, world, cones, comic stamps, print finishing pass
 src/game/             game loop, camera, input, audio, save data

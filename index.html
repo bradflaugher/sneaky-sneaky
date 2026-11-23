@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Sneaky Sneaky — a weaponless stealth heist comic</title>
-    <meta name="description" content="A pacifist stealth heist in graphic-novel style. No weapons, ever. Sneak, crouch, crawl vents, put guards to sleep and steal extremely silly treasure. Plays great on desktop and phones." />
+    <title>Sneaky Sneaky — a weaponless stealth comic</title>
+    <meta name="description" content="A pacifist spy comic. No weapons, ever. Sneak, crouch, crawl the ductwork and pull off extremely silly missions without being seen. Plays great on desktop and phones." />
     <meta name="theme-color" content="#0b0d12" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta property="og:title" content="Sneaky Sneaky" />
-    <meta property="og:description" content="A weaponless stealth heist comic. Don't get spotted." />
+    <meta property="og:description" content="A weaponless stealth comic. Don't get spotted." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sneakysneaky.win/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -23,7 +23,7 @@
     <div id="hud" class="hidden">
       <div id="objective" class="caption">
         <div id="room-tag">SECTOR 01</div>
-        <div id="obj-text">Steal the thing</div>
+        <div id="obj-text">Mission target</div>
         <div id="obj-sub"></div>
       </div>
       <div id="hud-right">
@@ -51,13 +51,13 @@
       <div class="cover">
         <div class="masthead">
           <div class="issue-badge"><span>ISSUE</span><b>#1</b></div>
-          <div class="cover-strip">A WEAPONLESS STEALTH HEIST</div>
+          <div class="cover-strip">A WEAPONLESS STEALTH COMIC</div>
         </div>
         <h1><span>SNEAKY</span><span class="l2">SNEAKY<i>!</i></span></h1>
-        <p class="tagline caption">No weapons. No alarms. Just you, a vent, and somebody's sourdough starter.</p>
+        <p class="tagline caption">No weapons. No alarms. Just you, the ductwork, and a very silly assignment.</p>
         <div class="menu">
-          <button id="btn-start" class="btn primary">START HEIST</button>
-          <button id="btn-vault" class="btn">LOOT VAULT</button>
+          <button id="btn-start" class="btn primary">START MISSION</button>
+          <button id="btn-vault" class="btn">CASE FILES</button>
           <button id="btn-setup" class="btn setup-btn"><span>MISSION SETUP</span><small id="setup-line">OPERATIVE · CLASSIC · COMPACT</small></button>
           <div class="row tiny"><span>ALL-AGES STEALTH</span><span id="seed-line"></span></div>
         </div>
@@ -93,12 +93,12 @@
 
     <section id="screen-clear" class="screen hidden">
       <div class="panel clear">
-        <div class="burst-wrap small"><div class="burst yellow"><div class="burst-in"><h2>CLEAN GETAWAY<i>!</i></h2></div></div></div>
+        <div class="burst-wrap small"><div class="burst yellow"><div class="burst-in"><h2>MISSION CLEAR<i>!</i></h2></div></div></div>
         <div id="clear-meta" class="meta-line"></div>
         <div class="rank-row">
           <div id="rank" class="rank">S</div>
           <div>
-            <div class="got">ACQUIRED</div>
+            <div class="got" id="clear-got">ACQUIRED</div>
             <div id="clear-loot"></div>
             <div id="clear-tag" class="meta-line"></div>
             <div id="clear-flavor"></div>
@@ -118,8 +118,8 @@
 
     <section id="screen-vault" class="screen dim hidden">
       <div class="panel wide">
-        <div class="panel-head">LOOT VAULT</div>
-        <h2 id="vault-count">0 unique trophies</h2>
+        <div class="panel-head">CASE FILES</div>
+        <h2 id="vault-count">0 case files closed</h2>
         <div id="vault-stats"></div>
         <div id="vault-filters" class="chips"></div>
         <div id="vault-list"></div>

@@ -1,7 +1,7 @@
 {
   "name": "Sneaky Sneaky",
   "short_name": "Sneaky Sneaky",
-  "description": "A weaponless 3D stealth heist: sneak, crouch, crawl vents and steal extremely silly treasure without ever being seen.",
+  "description": "A weaponless stealth comic: sneak, crouch, crawl the ductwork and pull off extremely silly spy missions without ever being seen.",
   "start_url": "./",
   "display": "fullscreen",
   "background_color": "#050505",
