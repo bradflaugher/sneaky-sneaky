@@ -8,9 +8,9 @@ import * as THREE from 'three';
 import { castRay } from '../core/grid.js';
 
 const RAYS = 40;
-const CALM = new THREE.Color(0x5cf0b0);
-const WARY = new THREE.Color(0xffb000);
-const HOT = new THREE.Color(0xff1f2f);
+const CALM = new THREE.Color(0x3ae8ff);
+const WARY = new THREE.Color(0xffd23a);
+const HOT = new THREE.Color(0xe5352b);
 
 const VERT = `
 attribute float aDist;
@@ -21,8 +21,8 @@ void main() {
   vWorld = position;
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }`;
-// Calm and legible: the crouch-visible zone is a soft translucent wash that
-// thins with distance; the standing-only zone is a fine, quiet hatch.
+// Graphic-novel cones: a clean translucent wash with a halftone dot fill where
+// even a crouching thief is seen, and dots alone where only a standing one is.
 const FRAG = `
 uniform vec3 uColor;
 uniform float uOpacity;
@@ -31,12 +31,12 @@ uniform float uStripe;
 varying float vDist;
 varying vec3 vWorld;
 void main() {
-  float wash = 1.0 - 0.55 * vDist;
-  float pulse = 0.94 + 0.06 * sin(vDist * 14.0 - uTime * 2.2);
-  float hatch = step(0.78, fract((vWorld.x + vWorld.z) * 3.2));
-  float fill = mix(wash * pulse, hatch * (1.0 - 0.4 * vDist), uStripe);
-  float rim = smoothstep(0.965, 1.0, vDist) * 0.5;
-  gl_FragColor = vec4(uColor * 1.1, min(1.0, uOpacity * fill + rim));
+  vec2 cell = fract(vWorld.xz * 2.6) - 0.5;
+  float dots = 1.0 - smoothstep(0.2, 0.26, length(cell) + vDist * 0.16);
+  float wash = 0.62 - 0.32 * vDist + 0.04 * sin(vDist * 12.0 - uTime * 2.0);
+  float fill = mix(wash + dots * 0.5, dots * 0.85, uStripe);
+  float rim = smoothstep(0.96, 0.985, vDist);
+  gl_FragColor = vec4(uColor * (1.05 + rim * 0.3), min(1.0, uOpacity * fill + rim * 0.45));
 }`;
 
 function makeLayer(opacity, stripe, y) {
@@ -63,13 +63,13 @@ function makeLayer(opacity, stripe, y) {
 }
 
 export function createCone(parent) {
-  const low = makeLayer(0.2, 0, 0.05);
-  const high = makeLayer(0.15, 1, 0.045);
+  const low = makeLayer(0.34, 0, 0.05);
+  const high = makeLayer(0.3, 1, 0.045);
   // hard inked outline around the whole cone
   const outlinePos = new Float32Array((RAYS + 3) * 3);
   const outlineGeo = new THREE.BufferGeometry();
   outlineGeo.setAttribute('position', new THREE.BufferAttribute(outlinePos, 3));
-  const outlineMat = new THREE.LineBasicMaterial({ color: 0x5cf0b0, transparent: true, opacity: 0.6, depthWrite: false });
+  const outlineMat = new THREE.LineBasicMaterial({ color: 0x3ae8ff, transparent: true, opacity: 0.95, depthWrite: false });
   const outline = new THREE.Line(outlineGeo, outlineMat);
   outline.frustumCulled = false;
   outline.renderOrder = 6;

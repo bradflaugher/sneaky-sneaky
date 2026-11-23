@@ -4,7 +4,7 @@
 import { vaultEntries, vaultSummary } from '../game/save.js';
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ['title', 'pause', 'fail', 'clear', 'vault', 'custom', 'setup'];
+const SCREENS = ['title', 'pause', 'fail', 'clear', 'vault', 'setup'];
 
 export const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -16,8 +16,6 @@ export class UI {
     this._bannerT = 0;
     const click = (id, name) => $(id).addEventListener('click', () => on[name]?.());
     click('btn-start', 'start');
-    click('btn-agent', 'agent');
-    click('btn-agent2', 'agent');
     click('btn-vault', 'vault');
     click('btn-setup', 'setup');
     click('btn-setup2', 'setup');
@@ -32,7 +30,6 @@ export class UI {
     click('btn-next', 'next');
     click('btn-clear-quit', 'quit');
     click('btn-vault-back', 'back');
-    click('btn-custom-done', 'back');
     click('btn-pause', 'pause');
     if (window.matchMedia('(pointer: coarse)').matches) this.setTouch(true);
   }
@@ -52,8 +49,7 @@ export class UI {
     $('hud').classList.toggle('hidden', !visible);
   }
 
-  setTitle({ agent, seed, setupLine }) {
-    $('agent-line').textContent = `AGENT: ${agent.codename.toUpperCase()}`;
+  setTitle({ seed, setupLine }) {
     $('seed-line').textContent = `SEED: ${seed}`;
     this.setSetupLine(setupLine);
   }

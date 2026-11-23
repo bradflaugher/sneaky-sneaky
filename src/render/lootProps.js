@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { toon } from './toon.js';
 
-// Cel-shaded and faceted like everything else; PBR-only options are ignored.
+// Cel-shaded and smooth; PBR-only options are ignored.
 const S = (color, o = {}) => toon(color, o);
 const GOLD = () => S(0xe0b040, { emissive: 0x4a3200 });
 
@@ -23,10 +23,10 @@ function kit() {
     g,
     put,
     box: (w, h, d, mat, ...r) => put(new THREE.BoxGeometry(w, h, d), mat, ...r),
-    sph: (r, mat, ...rest) => put(new THREE.IcosahedronGeometry(r, 1), mat, ...rest),
-    cyl: (rt, rb, h, mat, ...rest) => put(new THREE.CylinderGeometry(rt, rb, h, 8), mat, ...rest),
-    cone: (r, h, mat, ...rest) => put(new THREE.ConeGeometry(r, h, 6), mat, ...rest),
-    torus: (r, t, mat, ...rest) => put(new THREE.TorusGeometry(r, t, 5, 10), mat, ...rest),
+    sph: (r, mat, ...rest) => put(new THREE.SphereGeometry(r, 22, 16), mat, ...rest),
+    cyl: (rt, rb, h, mat, ...rest) => put(new THREE.CylinderGeometry(rt, rb, h, 26), mat, ...rest),
+    cone: (r, h, mat, ...rest) => put(new THREE.ConeGeometry(r, h, 22), mat, ...rest),
+    torus: (r, t, mat, ...rest) => put(new THREE.TorusGeometry(r, t, 10, 28), mat, ...rest),
   };
 }
 

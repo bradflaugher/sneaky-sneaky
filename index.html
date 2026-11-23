@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Sneaky Sneaky — a weaponless stealth heist</title>
-    <meta name="description" content="A pacifist 3D stealth puzzle game. No weapons, ever. Sneak, crouch, crawl vents, choke out guards and steal extremely silly treasure. Plays great on desktop and phones." />
-    <meta name="theme-color" content="#050505" />
+    <title>Sneaky Sneaky — a weaponless stealth heist comic</title>
+    <meta name="description" content="A pacifist stealth heist in graphic-novel style. No weapons, ever. Sneak, crouch, crawl vents, put guards to sleep and steal extremely silly treasure. Plays great on desktop and phones." />
+    <meta name="theme-color" content="#0b0d12" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta property="og:title" content="Sneaky Sneaky" />
-    <meta property="og:description" content="A weaponless 3D stealth heist. Don't get spotted." />
+    <meta property="og:description" content="A weaponless stealth heist comic. Don't get spotted." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sneakysneaky.win/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -18,17 +18,16 @@
   </head>
   <body>
     <canvas id="game" aria-label="Sneaky Sneaky game view"></canvas>
-    <div id="vignette"></div>
     <div id="flash"></div>
 
     <div id="hud" class="hidden">
-      <div id="objective" class="glass">
-        <div class="eyebrow" id="room-tag">SECTOR 01</div>
+      <div id="objective" class="caption">
+        <div id="room-tag">SECTOR 01</div>
         <div id="obj-text">Steal the thing</div>
         <div id="obj-sub"></div>
       </div>
       <div id="hud-right">
-        <div id="radar-wrap" class="glass"><canvas id="radar" width="300" height="300"></canvas><span class="radar-label">SOLITON</span></div>
+        <div id="radar-wrap"><canvas id="radar" width="300" height="300"></canvas><span class="radar-label">SOLITON</span></div>
         <div id="stats"><span id="timer">0:00</span><span id="ko" title="Knockouts">💤 0</span></div>
       </div>
       <button id="btn-pause" class="icon-btn" aria-label="Pause">❚❚</button>
@@ -49,39 +48,35 @@
     </div>
 
     <section id="screen-title" class="screen">
-      <div class="title-block">
-        <div class="eyebrow">A WEAPONLESS STEALTH HEIST</div>
+      <div class="cover">
+        <div class="masthead">
+          <div class="issue-badge"><span>ISSUE</span><b>#1</b></div>
+          <div class="cover-strip">A WEAPONLESS STEALTH HEIST</div>
+        </div>
         <h1><span>SNEAKY</span><span class="l2">SNEAKY<i>!</i></span></h1>
-        <p class="tagline">No weapons. No alarms. Just you, a vent, and somebody's sourdough starter.</p>
+        <p class="tagline caption">No weapons. No alarms. Just you, a vent, and somebody's sourdough starter.</p>
         <div class="menu">
           <button id="btn-start" class="btn primary">START HEIST</button>
-          <div class="row">
-            <button id="btn-agent" class="btn">AGENT</button>
-            <button id="btn-vault" class="btn">LOOT VAULT</button>
-          </div>
+          <button id="btn-vault" class="btn">LOOT VAULT</button>
           <button id="btn-setup" class="btn setup-btn"><span>MISSION SETUP</span><small id="setup-line">OPERATIVE · CLASSIC · COMPACT</small></button>
-          <div class="row tiny">
-            <span id="agent-line"></span>
-            <span id="seed-line"></span>
-          </div>
+          <div class="row tiny"><span>ALL-AGES STEALTH</span><span id="seed-line"></span></div>
         </div>
       </div>
     </section>
 
     <section id="screen-pause" class="screen dim hidden">
-      <div class="panel glass">
-        <div class="eyebrow">PAUSED</div>
-        <h2>Holding position</h2>
+      <div class="panel">
+        <div class="panel-head">PAUSED</div>
+        <h2>Meanwhile, in the shadows…</h2>
         <button id="btn-resume" class="btn primary">RESUME</button>
         <button id="btn-restart" class="btn">RESTART ROOM</button>
         <button id="btn-setup2" class="btn setup-btn"><span>MISSION SETUP</span><small id="setup-line2"></small></button>
-        <button id="btn-agent2" class="btn">AGENT</button>
-        <button id="btn-style" class="btn">VISUAL STYLE: PS1 COMIC</button>
+        <button id="btn-style" class="btn">VISUAL STYLE: COMIC PRINT</button>
         <button id="btn-mute" class="btn">SOUND: ON</button>
         <button id="btn-quit" class="btn ghost">QUIT TO TITLE</button>
         <div class="help">
           <p><b>Never be seen.</b> If a guard's cone fills, it's over.</p>
-          <p><b>Crouch</b> behind waist-high cover to vanish. The striped part of a cone only sees you standing.</p>
+          <p><b>Crouch</b> behind waist-high cover to vanish. The dotted part of a cone only sees you standing.</p>
           <p><b>Vents</b> skip walls. <b>Knock</b> lures guards. Sneak up <b>behind</b> a guard to put them to sleep.</p>
         </div>
       </div>
@@ -89,17 +84,16 @@
 
     <section id="screen-fail" class="screen hidden">
       <div class="fail-block">
-        <div class="bang">!</div>
-        <h2>MISSION FAILED</h2>
-        <p id="fail-reason">You were spotted.</p>
+        <div class="burst-wrap"><div class="burst red"><div class="burst-in"><h2>BUSTED<i>!!</i></h2></div></div></div>
+        <p id="fail-reason" class="caption">You were spotted.</p>
         <button id="btn-retry" class="btn primary">RETRY <kbd>R</kbd></button>
         <button id="btn-fail-quit" class="btn ghost small">quit to title</button>
       </div>
     </section>
 
     <section id="screen-clear" class="screen hidden">
-      <div class="panel glass clear">
-        <div class="eyebrow">EXTRACTION COMPLETE</div>
+      <div class="panel clear">
+        <div class="burst-wrap small"><div class="burst yellow"><div class="burst-in"><h2>CLEAN GETAWAY<i>!</i></h2></div></div></div>
         <div id="clear-meta" class="meta-line"></div>
         <div class="rank-row">
           <div id="rank" class="rank">S</div>
@@ -117,14 +111,14 @@
           <div><label>CLOSE CALLS</label><b id="st-cc"></b></div>
         </div>
         <div id="badges"></div>
-        <button id="btn-next" class="btn primary">NEXT ROOM <kbd>Space</kbd></button>
+        <button id="btn-next" class="btn primary">NEXT ISSUE <kbd>Space</kbd></button>
         <button id="btn-clear-quit" class="btn ghost small">bank it &amp; quit</button>
       </div>
     </section>
 
     <section id="screen-vault" class="screen dim hidden">
-      <div class="panel glass wide">
-        <div class="eyebrow">LOOT VAULT</div>
+      <div class="panel wide">
+        <div class="panel-head">LOOT VAULT</div>
         <h2 id="vault-count">0 unique trophies</h2>
         <div id="vault-stats"></div>
         <div id="vault-filters" class="chips"></div>
@@ -134,8 +128,8 @@
     </section>
 
     <section id="screen-setup" class="screen dim hidden">
-      <div class="panel glass wide setup">
-        <div class="eyebrow">MISSION SETUP</div>
+      <div class="panel wide setup">
+        <div class="panel-head">MISSION SETUP</div>
         <h2>Choose your own ramp</h2>
         <div id="setup-summary" class="meta-line"></div>
         <div id="setup-note" class="blurb hidden"></div>
@@ -144,24 +138,7 @@
       </div>
     </section>
 
-    <div id="loading" class="hidden"><div class="eyebrow">INFILTRATING</div><div id="loading-text"></div></div>
-
-    <section id="screen-custom" class="screen hidden">
-      <div class="custom-panel glass">
-        <div class="eyebrow" id="custom-title">AGENT DOSSIER</div>
-        <p id="custom-intro" class="blurb"></p>
-        <div class="field name-field">
-          <label for="codename">CODENAME</label>
-          <div class="name-row">
-            <input id="codename" maxlength="22" autocomplete="off" spellcheck="false" />
-            <button id="btn-dice" class="icon-btn" aria-label="Random codename">🎲</button>
-          </div>
-        </div>
-        <button id="btn-random-look" class="btn">REROLL AGENT</button>
-        <div id="custom-fields"></div>
-        <button id="btn-custom-done" class="btn primary">CONFIRM</button>
-      </div>
-    </section>
+    <div id="loading" class="hidden"><div class="caption">MEANWHILE…</div><div id="loading-text"></div></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

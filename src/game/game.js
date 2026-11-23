@@ -15,19 +15,17 @@ import { THEMES, THEME_IDS } from '../core/themes.js';
 import { resolveMods, tierFor, describeRun, describeSetup, setupFromParams, setupToParams, normalizeSetup } from '../core/difficulty.js';
 
 import { buildWorld } from '../render/world.js';
-import { buildCharacter, animateCharacter, settleCharacter, addSilhouette, guardSpec, agentSpec, yawOf } from '../render/character.js';
+import { buildCharacter, animateCharacter, settleCharacter, addSilhouette, disposeCharacter, setSpriteCamera, guardSpec, agentSpec, yawOf } from '../render/character.js';
 import { createCone } from '../render/cones.js';
-import { glowTexture } from '../render/textures.js';
 import { createFx } from '../render/fx.js';
 import { createComicPass, VISUAL_STYLES } from '../render/comicPass.js';
 
 import { CameraRig } from './camera.js';
 import { Input } from './input.js';
 import { GameAudio } from './audio.js';
-import { loadSave, storeSave, recordLoot, confirmAgent } from './save.js';
+import { loadSave, storeSave, recordLoot } from './save.js';
 import { UI } from '../ui/ui.js';
 import { Radar } from '../ui/radar.js';
-import { Customizer } from '../ui/customizer.js';
 import { SetupPanel } from '../ui/setup.js';
 
 const PLAYER_R = 0.28;
@@ -87,7 +85,6 @@ export class Game {
     this.input.onFirstGesture = () => this.audio.unlock();
     this.ui = new UI({
       start: () => this.startRun(),
-      agent: () => this.openCustomizer(),
       vault: () => this.openVault(),
       setup: () => this.openSetup(),
       resume: () => this.resume(),
@@ -108,12 +105,6 @@ export class Game {
     });
     this.setupPanel = new SetupPanel((setup) => this.applySetup(setup));
     this.radar = new Radar(document.getElementById('radar'));
-    this.customizer = new Customizer((agent, rebuild) => {
-      this.save.agent = agent;
-      storeSave(this.save);
-      if (rebuild) this.rebuildAgent();
-    });
-
     // ---- renderer
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     renderer.shadowMap.enabled = true;
@@ -136,14 +127,13 @@ export class Game {
     }
     this.composer.addPass(new OutputPass());
     this.comic = createComicPass();
-    if (!VISUAL_STYLES[this.save.settings.style]) this.save.settings.style = 'noir';
+    if (!VISUAL_STYLES[this.save.settings.style]) this.save.settings.style = 'print';
     this.comic.setStyle(this.save.settings.style);
     this.composer.addPass(this.comic.pass);
     this.ui.setStyle(VISUAL_STYLES[this.save.settings.style].name);
     // A cold key that follows the agent, so they always read against the dark.
-    this.agentLight = new THREE.PointLight(0xd8fff0, 4.5, 5.5, 1.6);
+    this.agentLight = new THREE.PointLight(0xdfe8ff, 5, 5.5, 1.6);
     this.scene.add(this.agentLight);
-    this.buildPreview();
 
     this.state = 'title';
     this.time = 0;
@@ -151,7 +141,11 @@ export class Game {
     this.lastTheme = null;
     this.guards = [];
     this.player = { x: 0, z: 0, ang: 0, crouchToggle: false, crouched: false, hasLoot: false, hidden: false, vent: null, choke: null, speed: 0, stepDist: 0, knockCd: 0 };
-    this.rebuildAgent();
+    // The thief: one nondescript figure in black, drawn at full resolution.
+    this.playerRig = buildCharacter(agentSpec(), { resolution: 512 });
+    addSilhouette(this.playerRig);
+    this.scene.add(this.playerRig.root);
+    this.playerRig.root.visible = false;
 
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 150));
@@ -187,70 +181,6 @@ export class Game {
     this.camera.fov = w < h ? 50 : 42;
     this.camera.updateProjectionMatrix();
     this.camRig.portrait = w < h * 0.9;
-    this.layoutPreview();
-  }
-
-  buildPreview() {
-    // The Agent Select stage: a dark plinth, one warm key from the front, hard
-    // emerald rim light from behind, and a slow shaft of light falling through.
-    const s = new THREE.Scene();
-    s.background = new THREE.Color(0x030b09);
-    s.fog = new THREE.Fog(0x030b09, 8, 19);
-    s.add(new THREE.HemisphereLight(0x6ab8a0, 0x0a1410, 0.55));
-    const key = new THREE.DirectionalLight(0xffe6c4, 2.4);
-    key.position.set(2.2, 3.6, 4);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.radius = 4;
-    Object.assign(key.shadow.camera, { left: -2.5, right: 2.5, top: 3, bottom: -1, near: 1, far: 12 });
-    const rimA = new THREE.DirectionalLight(0x5cf0b0, 2.6);
-    rimA.position.set(-3, 2.6, -3.5);
-    const rimB = new THREE.DirectionalLight(0x3ad8c8, 1.6);
-    rimB.position.set(3.2, 1.6, -3);
-    s.add(key, rimA, rimB);
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.3, 0.1, 48), new THREE.MeshStandardMaterial({ color: 0x0c1a16, roughness: 0.3, metalness: 0.4 }));
-    disc.position.y = -0.05;
-    disc.receiveShadow = true;
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.26, 0.008, 6, 96), new THREE.MeshBasicMaterial({ color: 0x5cf0b0 }));
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.005;
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(16, 48), new THREE.MeshStandardMaterial({ color: 0x06100d, roughness: 0.55, metalness: 0.2 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.1;
-    floor.receiveShadow = true;
-    const pool = new THREE.Mesh(new THREE.CircleGeometry(2.4, 40), new THREE.MeshBasicMaterial({ color: 0x5cf0b0, map: glowTexture(), transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false }));
-    pool.rotation.x = -Math.PI / 2;
-    pool.position.y = 0.012;
-    s.add(disc, ring, floor, pool);
-    this.previewScene = s;
-    this.previewCam = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
-    this.previewSpin = 0.5;
-  }
-
-  layoutPreview() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const cam = this.previewCam;
-    cam.aspect = w / h;
-    const portrait = w < h;
-    cam.position.set(0, 1.3, portrait ? 8.4 : 4.3);
-    cam.lookAt(0, 0.95, 0);
-    // Shift the picture so the agent sits in the space the panel leaves free.
-    if (portrait) cam.setViewOffset(w, h, 0, h * 0.29, w, h);
-    else cam.setViewOffset(w, h, Math.min(390, w * 0.46) / 2, 0, w, h);
-    cam.updateProjectionMatrix();
-  }
-
-  rebuildAgent() {
-    const spec = agentSpec(this.save.agent);
-    if (this.playerRig) this.playerRig.root.removeFromParent();
-    this.playerRig = buildCharacter(spec);
-    addSilhouette(this.playerRig);
-    this.scene.add(this.playerRig.root);
-    this.playerRig.root.visible = this.state !== 'title';
-    if (this.previewRig) this.previewRig.root.removeFromParent();
-    this.previewRig = buildCharacter(spec);
-    this.previewScene.add(this.previewRig.root);
   }
 
   themeFor(roomNo) {
@@ -264,7 +194,7 @@ export class Game {
   loadRoom(roomNo, attract = false) {
     // tear down the old room
     for (const g of this.guards) {
-      g.rig.root.removeFromParent();
+      disposeCharacter(g.rig);
       g.cone.dispose();
       g.icon.dispose();
     }
@@ -293,7 +223,7 @@ export class Game {
     this.radar.setRoom(room);
 
     this.guards = room.guards.map((def) => {
-      const rig = buildCharacter(guardSpec(room.themeId, new RNG(def.look)));
+      const rig = buildCharacter(guardSpec(room.themeId, new RNG(def.look)), { resolution: this.lowPower ? 320 : 384 });
       this.scene.add(rig.root);
       return { def, rig, cone: createCone(this.scene), icon: this.fx.headIcon(), pose: { x: 0, z: 0, ang: 0 }, tmp: {} };
     });
@@ -366,7 +296,7 @@ export class Game {
     this.playerRig.root.visible = false;
     this.ui.setHud(false);
     this.ui.hideBanner();
-    this.ui.setTitle({ agent: this.save.agent, seed: this.run.seed, setupLine: describeSetup(this.setup) });
+    this.ui.setTitle({ seed: this.run.seed, setupLine: describeSetup(this.setup) });
     this.ui.show('title');
   }
 
@@ -400,11 +330,6 @@ export class Game {
 
   startRun() {
     this.audio.unlock();
-    // First heist: meet (or reroll) your randomly generated agent before deploying.
-    if (!this.save.agentConfirmed) {
-      this.openCustomizer(true);
-      return;
-    }
     this.audio.uiBig();
     this.run.roomNo = 1;
     this.run.streak = 0;
@@ -432,7 +357,7 @@ export class Game {
     const tip = TIPS[this.run.roomNo - 1];
     // A quick lower-third strip that gets out of the way: tips linger a touch longer.
     const tipNow = this.run.roomNo <= TIPS.length && this.setup.start === 'compact' ? tip : null;
-    this.ui.banner(this.runLabel(), loot.name, tipNow || room.venue, tipNow ? 3.4 : 1.8);
+    this.ui.banner(`ISSUE #${String(this.run.roomNo).padStart(2, '0')} · ${room.venue}`, loot.name, tipNow || loot.tagline, tipNow ? 3.4 : 1.8);
     this.ui.hintKeys();
   }
 
@@ -466,14 +391,6 @@ export class Game {
     this.ui.show(null);
   }
 
-  openCustomizer(firstRun = false) {
-    this.returnTo = firstRun ? 'deploy' : this.state === 'paused' ? 'paused' : 'title';
-    this.state = 'custom';
-    this.customizer.open(this.save.agent, firstRun || !this.save.agentConfirmed);
-    this.ui.setHud(false);
-    this.ui.show('custom');
-  }
-
   openVault() {
     this.returnTo = 'title';
     this.state = 'vault';
@@ -481,25 +398,15 @@ export class Game {
   }
 
   back() {
-    if (this.state !== 'custom' && this.state !== 'vault' && this.state !== 'setup') return;
+    if (this.state !== 'vault' && this.state !== 'setup') return;
     const themeChanged = this.state === 'setup' && this.themeBefore !== this.setup.theme;
-    if (this.state === 'custom') {
-      // pressing Confirm on the agent screen locks the agent in
-      confirmAgent(this.save);
-      storeSave(this.save);
-      if (this.returnTo === 'deploy') {
-        this.state = 'title';
-        this.startRun();
-        return;
-      }
-    }
     if (this.returnTo === 'paused') {
       this.state = 'paused';
       this.ui.setHud(true);
       this.ui.show('pause');
     } else {
       this.state = 'title';
-      this.ui.setTitle({ agent: this.save.agent, seed: this.run.seed, setupLine: describeSetup(this.setup) });
+      this.ui.setTitle({ seed: this.run.seed, setupLine: describeSetup(this.setup) });
       this.ui.show('title');
       if (themeChanged) {
         // show the chosen setting behind the menu
@@ -522,7 +429,7 @@ export class Game {
 
   toggleStyle() {
     const s = this.save.settings;
-    s.style = s.style === 'noir' ? 'clean' : 'noir';
+    s.style = s.style === 'print' ? 'ink' : 'print';
     storeSave(this.save);
     this.comic.setStyle(s.style);
     this.ui.setStyle(VISUAL_STYLES[s.style].name);
@@ -588,6 +495,7 @@ export class Game {
     this.time += dt;
     const t = this.time;
 
+    setSpriteCamera(this.camRig.cur.yaw, this.camRig.cur.pitch);
     if (input.take('mute')) this.toggleMute();
     switch (this.state) {
       case 'title':
@@ -607,14 +515,9 @@ export class Game {
       case 'clear':
         if (this.clearT > 1.2 && (input.take('confirm') || input.take('action'))) this.nextRoom();
         break;
-      case 'custom':
       case 'setup':
       case 'vault':
-        if (input.take('pause')) {
-          // Esc on the first-run agent screen backs out without deploying
-          if (this.state === 'custom' && this.returnTo === 'deploy') this.enterTitle(true);
-          else this.back();
-        }
+        if (input.take('pause')) this.back();
         break;
     }
 
@@ -647,11 +550,7 @@ export class Game {
 
     // ---- camera
     const o = input.orbit;
-    if (this.state === 'custom') {
-      this.previewSpin += dt * 0.5 + o.dx * 1.4;
-      this.previewRig.root.rotation.y = this.previewSpin;
-      animateCharacter(this.previewRig, { mode: 'normal', speed: 0, crouch: false, t }, dt);
-    } else if (this.state === 'title' || this.state === 'vault' || (this.state === 'setup' && this.attract)) {
+    if (this.state === 'title' || this.state === 'vault' || (this.state === 'setup' && this.attract)) {
       // slow orbit over a live diorama, framed off-centre so the menu has air
       this.camRig.yaw += dt * 0.05;
       this.camRig.pitch = 0.74;
@@ -665,15 +564,12 @@ export class Game {
       this.camRig.update(dt, this.player.x, this.player.z, { distScale: this.state === 'clear' ? 0.7 : 1 });
     }
 
-    if (this.state !== 'paused' && this.state !== 'custom' && !(this.state === 'setup' && !this.attract)) {
+    if (this.state !== 'paused' && !(this.state === 'setup' && !this.attract)) {
       this.world.update(t, dt, this.camera.position);
       this.fx.update(dt);
     }
     if (this.state === 'playing' || this.state === 'failed') this.drawHud(t);
 
-    const preview = this.state === 'custom';
-    this.renderPass.scene = preview ? this.previewScene : this.scene;
-    this.renderPass.camera = preview ? this.previewCam : this.camera;
     this.agentLight.position.set(this.player.x, 2.3, this.player.z);
     this.agentLight.visible = this.playerRig.root.visible;
     this.comic.setTime(t);
@@ -791,7 +687,7 @@ export class Game {
         this.stats.knockouts++;
         p.choke = null;
         this.ui.toast('SWEET DREAMS', 1.2);
-        this.fx.stamp('ZZZ', '#efe6d2', c.g.pose.x, 2.0, c.g.pose.z, 0.6, 1.4);
+        this.fx.stamp('ZZZ...', '#f4efe2', c.g.pose.x, 1.5, c.g.pose.z, 0.6, 1.4);
       }
       this.ui.setAction(null);
       this.fx.setPrompt(null);
@@ -918,6 +814,7 @@ export class Game {
       this.playerRig.root.position.set(p.x, 0, p.z);
       this.playerRig.root.rotation.y = yawOf(p.ang);
       this.audio.choke();
+      this.fx.stamp('SHHH...', '#f4efe2', g.pose.x, 2.5, g.pose.z, 0.7, 1.0);
     } else if (ctx.type === 'grab') {
       p.hasLoot = true;
       this.world.setLootTaken(true);
@@ -958,7 +855,7 @@ export class Game {
     this.audio.knock();
     this.fx.ring(p.x, p.z, 0xffc266, KNOCK_RADIUS, 1.0);
     this.fx.ring(p.x, p.z, 0xffc266, KNOCK_RADIUS * 0.6, 0.8);
-    this.fx.stamp('KNOCK!', '#ffb000', p.x, 1.9, p.z, 0.62, 1.1);
+    this.fx.stamp('TAP! TAP!', '#ffd23a', p.x, 2.1, p.z, 0.7, 1.1);
     let heard = false;
     for (const g of this.guards) {
       if (!AWAKE.has(g.state)) continue;
