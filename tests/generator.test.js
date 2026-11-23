@@ -6,7 +6,6 @@ import { solveTopology, solveStealth, STEP_DT } from '../src/core/solver.js';
 import { poseAt, buildTimeline } from '../src/core/patrol.js';
 import { canSee, isBumping } from '../src/core/stealth.js';
 import { THEME_IDS } from '../src/core/themes.js';
-import { LOOT_BY_ID } from '../src/core/loot.js';
 import { floodFromStart, roomFromAscii } from './helpers.js';
 
 const SEEDS_PER_THEME = 22; // 6 themes x 22 = 132 rooms
@@ -30,6 +29,7 @@ test('generation is deterministic for a seed', () => {
     assert.deepEqual(Array.from(again.cells), Array.from(r.cells));
     assert.deepEqual(again.start, r.start);
     assert.deepEqual(again.loot, r.loot);
+    assert.equal(again.venue, r.venue);
     assert.deepEqual(again.vents, r.vents);
     assert.deepEqual(again.guards.map((g) => g.pts), r.guards.map((g) => g.pts));
   }
@@ -60,7 +60,8 @@ test('every room: sane geometry, border walls, spawn/loot/exit placement', () =>
     assert.ok(isFloor(r, r.start.cx, r.start.cy), label(r));
     assert.ok(isFloor(r, r.exit.cx, r.exit.cy), label(r));
     assert.equal(cellAt(r, r.loot.cx, r.loot.cy), COVER, 'loot sits on a pedestal');
-    assert.ok(LOOT_BY_ID[r.loot.item], 'loot item exists');
+    assert.ok(r.loot.info && r.loot.info.name && r.loot.item === r.loot.info.id, 'room has a heist target');
+    assert.ok(r.venue && r.venue.length > 8, 'room has a venue name');
     assert.ok(r.chambers.length >= 2);
     assert.ok(r.start.cx !== r.exit.cx || r.start.cy !== r.exit.cy);
     assert.ok(r.par > 0);

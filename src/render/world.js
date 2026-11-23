@@ -5,13 +5,15 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { WALL, cellAt } from '../core/grid.js';
 import { RNG } from '../core/rng.js';
 import { ART, VENT_COLORS, WALL_H } from './themeArt.js';
-import { floorTexture, wallTexture, miscTexture, skylineTexture, skyTexture, glowTexture, shaftTexture, paintedTexture } from './textures.js';
+import { floorTexture, wallTexture, miscTexture, skylineTexture, skyTexture, glowTexture, poolTexture, shaftTexture, paintedTexture } from './textures.js';
+import { toon, glowToon, inkEdges, inkAll } from './toon.js';
 import { buildLootProp } from './lootProps.js';
 import { LOOT_BY_ID } from '../core/loot.js';
 
-const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
-const glowMat = (color, intensity = 2) =>
-  new THREE.MeshStandardMaterial({ color: 0x111111, emissive: color, emissiveIntensity: intensity, roughness: 0.4 });
+// Everything solid is cel-shaded and flat-faceted (see toon.js).
+const std = (color, o = {}) => toon(color, o);
+const glowMat = (color, intensity = 2) => glowToon(color, intensity);
+const matOf = (o) => toon(o.color ?? 0xffffff, o);
 const additive = (color, opacity, map = null) =>
   new THREE.MeshBasicMaterial({ color, map, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
 
@@ -57,6 +59,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
   const animated = [];
   const { w, h } = room;
   const glowTex = glowTexture();
+  const poolTex = poolTexture();
   const shaftTex = shaftTexture();
 
   const mesh = (geo, mat, parent = group, shadow = true) => {
@@ -73,8 +76,8 @@ export function buildWorld(room, { lowPower = false } = {}) {
     geos.forEach((x) => x.dispose());
     return mesh(g, mat, group, shadow);
   };
-  const decal = (color, size, x, z, opacity = 0.5, y = 0.02) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), additive(color, opacity, glowTex));
+  const decal = (color, size, x, z, opacity = 0.5, y = 0.02, tex = glowTex) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), additive(color, opacity, tex));
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, y, z);
     m.renderOrder = 2;
@@ -106,19 +109,19 @@ export function buildWorld(room, { lowPower = false } = {}) {
     return m;
   };
   if (art.env === 'ocean') {
-    const sea = ground(std(0x1d5a78, { roughness: 0.18, metalness: 0.75 }), -2.4);
+    const sea = ground(new THREE.MeshBasicMaterial({ color: 0x020409 }), -2.4);
     sea.receiveShadow = false;
-    const hullM = std(0xf7f7f2, { roughness: 0.35 });
+    const hullM = std(0x3a3f45, { map: miscTexture('metal') });
     mesh(new THREE.BoxGeometry(w + 3, 2.6, h + 3), hullM).position.set(w / 2, -1.32, h / 2);
     const bow = mesh(new THREE.CylinderGeometry((h + 3) / 2 / Math.cos(Math.PI / 4) / 1.4142, (h + 3) / 2.4, 2.6, 4, 1), hullM);
     bow.rotation.y = Math.PI / 4;
     bow.scale.set(1.5, 1, 1);
     bow.position.set(w + 1.5, -1.32, h / 2);
-    mesh(new THREE.BoxGeometry(w + 3.1, 0.25, h + 3.1), std(0x1d3f7a)).position.set(w / 2, -1.4, h / 2);
+    mesh(new THREE.BoxGeometry(w + 3.1, 0.25, h + 3.1), std(0x7a0f1c)).position.set(w / 2, -1.4, h / 2);
     for (let i = 0; i < 26; i++) {
-      const s = decal(0xffd9a0, rng.range(3, 9), w / 2 - rng.range(20, 120), h / 2 + rng.range(-70, 70), 0.25, -2.38);
+      const s = decal(0xffa238, rng.range(3, 9), w / 2 - rng.range(20, 120), h / 2 + rng.range(-70, 70), 0.25, -2.38);
       s.scale.y = 0.18;
-      animated.push((t) => (s.material.opacity = 0.12 + 0.14 * Math.sin(t * 1.3 + i)));
+      animated.push((t) => (s.material.opacity = 0.05 + 0.07 * Math.max(0, Math.sin(t * 1.3 + i))));
     }
   } else if (art.env === 'skyline') {
     const tex = skylineTexture();
@@ -129,7 +132,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     sk.renderOrder = -5;
     group.add(sk);
     disposables.push(cylGeo);
-    mesh(new THREE.BoxGeometry(w + 0.6, 60, h + 0.6), std(0x0d1220, { roughness: 0.25, metalness: 0.6 }), group, false).position.set(w / 2, -30.06, h / 2);
+    mesh(new THREE.BoxGeometry(w + 0.6, 60, h + 0.6), std(0x05060c), group, false).position.set(w / 2, -30.06, h / 2);
   } else if (art.env === 'desert') {
     const tex = miscTexture('sand');
     const m = std(0xffffff, { map: tex.clone(), roughness: 1 });
@@ -139,7 +142,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     for (let i = 0; i < 16; i++) {
       const a = rng.range(0, Math.PI * 2);
       const d = rng.range(Math.max(w, h) * 0.75 + 6, 70);
-      const dune = mesh(new THREE.SphereGeometry(1, 16, 10), std(0xd8b582, { roughness: 1 }), group, false);
+      const dune = mesh(new THREE.IcosahedronGeometry(1, 1), std(0x1c1510), group, false);
       dune.scale.set(rng.range(6, 16), rng.range(1.2, 4), rng.range(5, 12));
       dune.position.set(w / 2 + Math.cos(a) * d, -0.3, h / 2 + Math.sin(a) * d);
       dune.rotation.y = rng.range(0, 3);
@@ -148,7 +151,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     const tex = floorTexture('vrgrid').clone();
     tex.repeat.set(125, 125);
     tex.needsUpdate = true;
-    ground(new THREE.MeshBasicMaterial({ map: tex, color: 0x66aaaa }), -0.03);
+    ground(new THREE.MeshBasicMaterial({ map: tex, color: 0x3a6a6a }), -0.03);
     const lm = new THREE.LineBasicMaterial({ color: 0x3cffe1, transparent: true, opacity: 0.55 });
     for (let i = 0; i < 18; i++) {
       const a = rng.range(0, Math.PI * 2);
@@ -170,10 +173,8 @@ export function buildWorld(room, { lowPower = false } = {}) {
     const tex = floorTexture(art.floor).clone();
     tex.repeat.set(w / 2, h / 2);
     tex.needsUpdate = true;
-    const mat =
-      room.themeId === 'vr'
-        ? new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.6 })
-        : std(0xffffff, { map: tex, roughness: art.floor === 'marble' || art.floor === 'tile' ? 0.35 : 0.85, metalness: art.floor === 'marble' ? 0.25 : 0 });
+    // VR is unlit phosphor on black, exactly as drawn
+    const mat = room.themeId === 'vr' ? new THREE.MeshBasicMaterial({ map: tex }) : std(0xffffff, { map: tex });
     const f = mesh(new THREE.PlaneGeometry(w, h), mat, group, false);
     f.rotation.x = -Math.PI / 2;
     f.position.set(w / 2, 0, h / 2);
@@ -186,9 +187,10 @@ export function buildWorld(room, { lowPower = false } = {}) {
   if (room.themeId === 'vr') {
     wallMat.emissiveMap = wallMat.map;
     wallMat.emissive = new THREE.Color(0xffffff);
-    wallMat.emissiveIntensity = 0.5;
+    wallMat.emissiveIntensity = 0.9;
+    wallMat.color.setHex(0x0a1416);
   }
-  const capMat = art.capGlow ? new THREE.MeshStandardMaterial({ color: 0x0a2e34, emissive: art.cap, emissiveIntensity: 0.16, roughness: 0.5 }) : std(art.cap, { roughness: 0.55, metalness: art.capMetal || 0.1 });
+  const capMat = art.capGlow ? matOf({ color: 0x031416, emissive: art.cap, emissiveIntensity: 0.12 }) : std(art.cap, { roughness: 0.55, metalness: art.capMetal || 0.1 });
   const wallGeos = [];
   const capGeos = [];
   const solidOuter = art.outer === 'solid';
@@ -196,14 +198,16 @@ export function buildWorld(room, { lowPower = false } = {}) {
     wallGeos.push(wallBox(r.x, 0, r.y, r.x + r.w, WALL_H, r.y + r.h));
     capGeos.push(new THREE.BoxGeometry(r.w + 0.08, 0.09, r.h + 0.08).translate(r.x + r.w / 2, WALL_H + 0.045, r.y + r.h / 2));
   }
-  merged(wallGeos, wallMat);
-  merged(capGeos, capMat, false);
+  const innerWalls = merged(wallGeos, wallMat);
+  if (innerWalls) inkEdges(innerWalls);
+  const innerCaps = merged(capGeos, capMat, false);
+  if (innerCaps) inkEdges(innerCaps);
 
   // The four outer walls are separate groups so whichever ones stand between
   // the camera and the room can sink out of the way (dollhouse cutaway).
-  const railMat = std(0xd9b25a, { metalness: 0.6, roughness: 0.4 });
-  const frameMat = std(0x20242e, { metalness: 0.6, roughness: 0.4 });
-  const glassMat = std(0x9fc8ff, { transparent: true, opacity: 0.14, roughness: 0.05, metalness: 0.5, depthWrite: false });
+  const railMat = std(0xb8862a);
+  const frameMat = std(0x0c0d12);
+  const glassMat = std(0x5a78c8, { transparent: true, opacity: 0.1, depthWrite: false });
   const sides = [
     { r: { x: 0, y: 0, w, h: 1 }, hidden: (c) => c.z < 0.5 },
     { r: { x: 0, y: h - 1, w, h: 1 }, hidden: (c) => c.z > h - 0.5 },
@@ -218,6 +222,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     side.sink = 0;
     const add = (geo, mat, shadow = true) => {
       const m = mesh(geo, mat, g, shadow);
+      if (!mat.transparent) inkEdges(m);
       return m;
     };
     const long = r.w >= r.h;
@@ -254,32 +259,32 @@ export function buildWorld(room, { lowPower = false } = {}) {
 
   // ------------------------------------------------------------ cover props
   const M = {
-    walnut: std(0xffffff, { map: miscTexture('wood'), roughness: 0.55 }),
-    darkwood: std(0x8a7060, { map: miscTexture('wood'), roughness: 0.6 }),
+    walnut: std(0xffffff, { map: miscTexture('wood') }),
+    darkwood: std(0x9a8a7a, { map: miscTexture('wood') }),
     crate: std(0xffffff, { map: miscTexture('crate') }),
     ammo: std(0xffffff, { map: miscTexture('ammo') }),
-    fabric: std(0x7d93b8, { map: miscTexture('fabric'), roughness: 1 }),
-    white: std(0xd9d6cf, { roughness: 0.6 }),
-    leather: std(0xd9d2c4, { roughness: 0.6 }),
-    brass: std(0xd9b25a, { metalness: 0.9, roughness: 0.25 }),
-    metal: std(0x8fa2ac, { metalness: 0.7, roughness: 0.35 }),
-    darkmetal: std(0x2a2f38, { metalness: 0.6, roughness: 0.45 }),
-    labwhite: std(0xc9d3d8, { roughness: 0.5 }),
-    sandbag: std(0xb89a6a, { map: miscTexture('fabric'), roughness: 1 }),
-    marble: std(0xe8e4dc, { roughness: 0.25 }),
-    darkmarble: std(0x22212b, { roughness: 0.25, metalness: 0.2 }),
-    velvet: std(0x8a1f2f, { roughness: 1 }),
-    glass: std(0xcfe8ff, { transparent: true, opacity: 0.2, roughness: 0.03, metalness: 0.3 }),
-    leaf: std(0x3f8a4a, { roughness: 0.9, flatShading: true }),
-    screen: glowMat(art.glow, 1.5),
-    warm: glowMat(0xffc266, 1.8),
-    accent: std(room.themeId === 'yacht' ? 0x1d3f7a : 0xd9432f, { roughness: 0.7 }),
-    holo: new THREE.MeshStandardMaterial({ color: 0x031a20, emissive: 0x0a6a6a, emissiveIntensity: 0.5, transparent: true, opacity: 0.85, roughness: 0.3 }),
-    gold: std(0xf2c14e, { metalness: 0.9, roughness: 0.22 }),
+    fabric: std(0x4a5670, { map: miscTexture('fabric') }),
+    white: std(0x8a8880, { map: miscTexture('metal') }),
+    leather: std(0x6a1218),
+    brass: std(0xb8862a),
+    metal: std(0xffffff, { map: miscTexture('metal') }),
+    darkmetal: std(0x1a1d22),
+    labwhite: std(0x9aa8a2, { map: miscTexture('metal') }),
+    sandbag: std(0x7a6646, { map: miscTexture('fabric') }),
+    marble: std(0xb0aa9e),
+    darkmarble: std(0x14131a),
+    velvet: std(0x7a0f1c),
+    glass: std(0x9fc8ff, { transparent: true, opacity: 0.16 }),
+    leaf: std(0x1f4a2a),
+    screen: glowMat(art.glow, 1.6),
+    warm: glowMat(0xffb040, 2),
+    accent: std(room.themeId === 'yacht' ? 0x16264a : 0x9a1420),
+    holo: new THREE.MeshBasicMaterial({ color: 0x010b0d, transparent: true, opacity: 0.9 }),
+    gold: std(0xc9a24a),
   };
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
-  const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
-  const unitSph = new THREE.SphereGeometry(0.5, 14, 10);
+  const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+  const unitSph = new THREE.IcosahedronGeometry(0.5, 1);
   const unitIco = new THREE.IcosahedronGeometry(0.5, 0);
   disposables.push(unitBox, unitCyl, unitSph, unitIco);
   const part = (parent, geo, mat, sx, sy, sz, x, y, z, shadow = true) => {
@@ -289,6 +294,8 @@ export function buildWorld(room, { lowPower = false } = {}) {
     m.castShadow = shadow;
     m.receiveShadow = true;
     parent.add(m);
+    // hard-surface parts get inked crease lines
+    if (shadow && !mat.transparent && (geo === unitBox || geo === unitCyl)) inkEdges(m);
     return m;
   };
 
@@ -448,7 +455,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
             const [x, z] = at(along(i, L * 2) + rng.range(-0.1, 0.1), rng.range(-0.2, 0.2));
             if (room.themeId === 'lab') {
               const col = rng.pick([0x48ffd0, 0xff6fd8, 0xffd12e, 0x4fd8ff]);
-              part(g, unitCyl, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.1, transparent: true, opacity: 0.8, roughness: 0.1 }), 0.11, rng.range(0.12, 0.26), 0.11, x, 0.97, z, false);
+              part(g, unitCyl, matOf({ color: col, emissive: col, emissiveIntensity: 1.1, transparent: true, opacity: 0.8, roughness: 0.1 }), 0.11, rng.range(0.12, 0.26), 0.11, x, 0.97, z, false);
             } else {
               part(g, unitBox, rng.chance(0.5) ? M.ammo : M.darkmetal, 0.3, 0.18, 0.22, x, 0.97, z).rotation.y = rng.range(0, 3);
             }
@@ -506,15 +513,15 @@ export function buildWorld(room, { lowPower = false } = {}) {
     paintedTexture(`${room.themeId}:${i}`, (g, s, r) => {
       const hue = r.int(0, 360);
       const gr = g.createLinearGradient(0, 0, s, s);
-      gr.addColorStop(0, `hsl(${hue},55%,${room.themeId === 'museum' ? 34 : 60}%)`);
-      gr.addColorStop(1, `hsl(${(hue + 70) % 360},60%,${room.themeId === 'museum' ? 18 : 40}%)`);
+      gr.addColorStop(0, `hsl(${hue},50%,30%)`);
+      gr.addColorStop(1, `hsl(${(hue + 70) % 360},60%,10%)`);
       g.fillStyle = gr;
       g.fillRect(0, 0, s, s);
       for (let k = 0; k < 7; k++) {
-        g.fillStyle = `hsla(${(hue + r.int(100, 260)) % 360},70%,${r.int(45, 75)}%,${r.range(0.4, 0.9)})`;
+        g.fillStyle = r.chance(0.25) ? '#050505' : `hsl(${(hue + r.int(100, 260)) % 360},65%,${r.int(30, 60)}%)`;
         g.beginPath();
-        if (r.chance(0.5)) g.arc(r.range(0, s), r.range(0, s), r.range(6, 30), 0, 7);
-        else g.rect(r.range(0, s), r.range(0, s), r.range(10, 50), r.range(4, 40));
+        if (r.chance(0.5)) g.arc(r.range(0, s), r.range(0, s), r.range(3, 14), 0, 7);
+        else g.rect(Math.round(r.range(0, s)), Math.round(r.range(0, s)), Math.round(r.range(5, 24)), Math.round(r.range(2, 20)));
         g.fill();
       }
     });
@@ -556,7 +563,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
               p(unitCyl, M.darkmetal, 0.62, 0.16, 0.44, 0, 0.08, 0.02, true);
               p(unitCyl, M.darkmetal, 0.62, 0.14, 0.44, 0, 2.05, 0.02, true);
               const col = rng.pick([0x48ffd0, 0x7dff5a, 0xff6fd8]);
-              const liquid = p(unitCyl, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.9, transparent: true, opacity: 0.55, roughness: 0.05 }), 0.54, 1.84, 0.38, 0, 1.07, 0.02);
+              const liquid = p(unitCyl, matOf({ color: col, emissive: col, emissiveIntensity: 0.9, transparent: true, opacity: 0.55, roughness: 0.05 }), 0.54, 1.84, 0.38, 0, 1.07, 0.02);
               const blob = p(unitSph, glowMat(col, 2.4), 0.2, 0.36, 0.16, 0, 1.0, 0.02);
               const ph = rng.range(0, 6);
               animated.push((tt) => {
@@ -617,40 +624,61 @@ export function buildWorld(room, { lowPower = false } = {}) {
   rim.position.set(w / 2 - sd.x * 30, 14, h / 2 - sd.z * 30);
   rim.target.position.set(w / 2, 0, h / 2);
   group.add(rim, rim.target);
-  if (art.lamp[1] > 0) {
-    lampSpots.slice(0, lowPower ? 3 : 6).forEach((s) => {
-      const l = new THREE.PointLight(art.lamp[0], art.lamp[1], 11, 1.6);
-      l.position.set(s.x, 2.7, s.z);
+  // One hard practical per chamber: a stepped pool of light in the dark.
+  lampSpots.forEach((s, i) => {
+    if (i < (lowPower ? 4 : 9)) {
+      const l = new THREE.PointLight(art.lamp[0], art.lamp[1], 9.5, 1.5);
+      l.position.set(s.x, 3.0, s.z);
       group.add(l);
-      decal(art.lamp[0], 6.5, s.x, s.z, 0.1);
-      if (room.themeId === 'museum') shaft(art.lamp[0], s.x, s.z, 2.2, 6, 0.05);
-    });
-  }
-  if (room.themeId === 'bunker') {
-    for (const s of lampSpots) {
-      const sf = shaft(0xffe0a0, s.x + 0.8, s.z, 1.5, 7.5, 0.16);
-      sf.rotation.z = 0.28;
-      decal(0xffe0a0, 4.2, s.x, s.z, 0.3);
     }
+    const pool = decal(art.lamp[0], 6.2, s.x, s.z, 0.13, 0.021, poolTex);
+    if (room.themeId === 'lab' && i % 3 === 1) animated.push((t) => (pool.material.opacity = Math.sin(t * 31 + i) > 0.86 ? 0.03 : 0.13)); // a dying tube
+    if (room.themeId === 'museum' || room.themeId === 'bunker' || room.themeId === 'yacht') {
+      const sf = shaft(art.lamp[0], s.x + (room.themeId === 'bunker' ? 0.9 : 0), s.z, 2.1, 6.5, 0.07);
+      if (room.themeId === 'bunker') sf.rotation.z = 0.28;
+    }
+  });
+
+  // Storm rain: short hard streaks.
+  if (art.rain && !lowPower) {
+    const n = 260;
+    const pos = new Float32Array(n * 6);
+    const seeds = [];
+    for (let i = 0; i < n; i++) seeds.push([rng.range(-4, w + 4), rng.range(0, 9), rng.range(-4, h + 4), rng.range(9, 14)]);
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const rain = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x8fa8d8, transparent: true, opacity: 0.35 }));
+    rain.frustumCulled = false;
+    group.add(rain);
+    disposables.push(rg);
+    animated.push((t) => {
+      for (let i = 0; i < n; i++) {
+        const [x, y0, z, v] = seeds[i];
+        const y = 9 - ((y0 + t * v) % 9);
+        pos.set([x + y * 0.12, y, z, x + (y + 0.45) * 0.12, y + 0.45, z], i * 6);
+      }
+      rg.attributes.position.needsUpdate = true;
+    });
   }
 
   // ------------------------------------------------------------ loot
   const loot = new THREE.Group();
   loot.position.set(room.loot.x, 1.0, room.loot.z);
-  const prop = buildLootProp(lootPropOf(room));
+  const prop = buildLootProp(room.loot.info || lootPropOf(room));
+  inkAll(prop, 0.007);
   prop.scale.setScalar(1.25);
   loot.add(prop);
   group.add(loot);
-  const lootBeam = shaft(0xffe9a8, room.loot.x, room.loot.z, 0.42, 5.5, 0.16);
-  lootBeam.position.y = 1 + 2.75;
-  const lootGlow = decal(0xffd27a, 3.4, room.loot.x, room.loot.z, 0.28);
-  const lootLight = new THREE.PointLight(0xffd9a0, 4, 6, 1.8);
+  const lootBeam = shaft(0xffd27a, room.loot.x, room.loot.z, 0.34, 5.5, 0.07);
+  lootBeam.position.y = 1.55 + 2.75; // starts above the prop so the prize itself stays readable
+  const lootGlow = decal(0xffd27a, 3.0, room.loot.x, room.loot.z, 0.3, 0.023, poolTex);
+  const lootLight = new THREE.PointLight(0xfff0d8, 3.2, 6, 1.6);
   lootLight.position.set(room.loot.x, 2.2, room.loot.z);
   group.add(lootLight);
   animated.push((t) => {
     prop.rotation.y = t * 0.9;
     prop.position.y = 0.08 + Math.sin(t * 2) * 0.04;
-    lootBeam.material.opacity = 0.13 + Math.sin(t * 3) * 0.04;
+    lootBeam.material.opacity = 0.06 + Math.sin(t * 3) * 0.025;
   });
 
   // ------------------------------------------------------------ extraction pad
@@ -661,7 +689,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
   const padRing = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.44, 32), padRingM);
   padRing.rotation.x = -Math.PI / 2;
   padRing.position.y = 0.025;
-  const padDiscM = new THREE.MeshStandardMaterial({ color: 0x20262e, roughness: 0.5, metalness: 0.5 });
+  const padDiscM = matOf({ color: 0x20262e, roughness: 0.5, metalness: 0.5 });
   const padDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.03, 32), padDiscM);
   padDisc.position.y = 0.012;
   padDisc.receiveShadow = true;
@@ -685,7 +713,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
   });
 
   // ------------------------------------------------------------ vents
-  const ductM = std(0x6f7c86, { metalness: 0.7, roughness: 0.4 });
+  const ductM = std(0xffffff, { map: miscTexture('metal') });
   room.vents.forEach((v, vi) => {
     const col = VENT_COLORS[vi % VENT_COLORS.length];
     const gm = glowMat(col, 1.8);

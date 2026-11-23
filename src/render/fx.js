@@ -1,14 +1,14 @@
-// Lightweight effects: sound rings, floating glyphs (! ? Zzz), prompt rings,
-// sparkles. Everything is pooled per room and thrown away with it.
+// Lightweight effects: sound rings, comic-book stamps (! ? ZZZ KNOCK!), prompt
+// rings, sparks. Everything is pooled per room and thrown away with it.
 
 import * as THREE from 'three';
-import { glyphTexture, glowTexture } from './textures.js';
+import { stampTexture, glowTexture } from './textures.js';
 
 export function createFx(parent) {
   const group = new THREE.Group();
   parent.add(group);
   const live = [];
-  const ringGeo = new THREE.RingGeometry(0.93, 1, 64);
+  const ringGeo = new THREE.RingGeometry(0.9, 1, 24);
   const glow = glowTexture();
 
   const sprite = (tex, color = 0xffffff) => {
@@ -20,7 +20,7 @@ export function createFx(parent) {
 
   // The glowing ring that marks the current context-action target.
   const prompt = new THREE.Mesh(
-    new THREE.RingGeometry(0.5, 0.6, 48),
+    new THREE.RingGeometry(0.48, 0.6, 8),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
   );
   prompt.rotation.x = -Math.PI / 2;
@@ -40,23 +40,27 @@ export function createFx(parent) {
       live.push({ t: 0, dur, tick: (k) => {
         const e = 1 - Math.pow(1 - k, 3);
         m.scale.setScalar(0.2 + e * maxR);
-        m.material.opacity = 0.9 * (1 - k);
+        m.material.opacity = k < 0.75 ? 0.95 : 0.95 * (1 - (k - 0.75) / 0.25);
       }, end: () => { m.removeFromParent(); m.material.dispose(); } });
     },
-    /** A glyph that floats up and fades: Zzz, +1, etc. */
-    floatGlyph(ch, color, x, y, z, size = 0.45, dur = 1.8) {
-      const s = sprite(glyphTexture(ch, color, color));
-      const drift = (Math.random() - 0.5) * 0.5;
+    /** A hand-lettered comic stamp that slams in, drifts up and fades: ZZZ, KNOCK!, YOINK! */
+    stamp(text, color, x, y, z, size = 0.5, dur = 1.6, burstColor = null) {
+      const wide = text.length > 1;
+      const s = sprite(stampTexture(text, color, { burstColor, w: wide ? 256 : 128, h: 128 }));
+      const tilt = (Math.random() - 0.5) * 0.5;
+      const drift = (Math.random() - 0.5) * 0.4;
       live.push({ t: 0, dur, tick: (k) => {
-        s.position.set(x + drift * k + Math.sin(k * 6) * 0.08, y + k * 0.9, z);
-        s.scale.setScalar(size * (0.5 + k * 0.8));
-        s.material.opacity = k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85;
+        const slam = k < 0.12 ? 1.9 - (k / 0.12) * 0.9 : 1;
+        s.position.set(x + drift * k, y + k * 0.7, z);
+        s.scale.set(size * (wide ? 2 : 1) * slam, size * slam, 1);
+        s.material.rotation = tilt;
+        s.material.opacity = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
       }, end: () => { s.removeFromParent(); s.material.dispose(); } });
     },
     /** Persistent head icon for a guard; returns a handle. */
     headIcon() {
-      const q = sprite(glyphTexture('?', '#ffc233', '#ffb020'));
-      const bang = sprite(glyphTexture('!', '#ff3b30', '#ff2a2a'));
+      const q = sprite(stampTexture('?', '#ffb000'));
+      const bang = sprite(stampTexture('!', '#e0101f', { burstColor: '#efe6d2' }));
       q.visible = bang.visible = false;
       let pop = 0;
       return {
@@ -67,12 +71,14 @@ export function createFx(parent) {
             pop = Math.min(1, pop + dt * 7);
             const s = 1.0 + Math.sin(pop * Math.PI) * 0.8;
             bang.position.set(x, y + 0.2, z);
-            bang.scale.setScalar(0.95 * s);
+            bang.scale.setScalar(1.25 * s);
+            bang.material.rotation = -0.18;
           } else {
             pop = 0;
             if (kind === '?') {
               q.position.set(x, y + 0.08, z);
-              q.scale.setScalar(0.4 + 0.35 * amount);
+              q.scale.setScalar(0.5 + 0.4 * amount);
+              q.material.rotation = 0.15;
               q.material.opacity = 0.55 + 0.45 * amount;
             }
           }

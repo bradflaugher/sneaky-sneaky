@@ -1,16 +1,16 @@
 // Diegetic vision cones: a floor-hugging fan per guard whose rays are clipped
 // by the same grid raycast the detection logic uses, so what you see is
 // exactly what they see. Two layers:
-//   bright  – where even a crouching agent is visible
-//   faint   – the extra area visible only over waist-high cover (standing)
+//   banded fill  – where even a crouching agent is visible
+//   crosshatch   – the extra area visible only over waist-high cover (standing)
 
 import * as THREE from 'three';
 import { castRay } from '../core/grid.js';
 
 const RAYS = 40;
-const CALM = new THREE.Color(0x3ef0ff);
-const WARY = new THREE.Color(0xffb020);
-const HOT = new THREE.Color(0xff2a2a);
+const CALM = new THREE.Color(0x19f0e0);
+const WARY = new THREE.Color(0xffb000);
+const HOT = new THREE.Color(0xff1f2f);
 
 const VERT = `
 attribute float aDist;
@@ -21,6 +21,8 @@ void main() {
   vWorld = position;
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }`;
+// Graphic, not glowy: the crouch-visible zone is a flat fill with hard marching
+// bands; the standing-only zone is inked crosshatching.
 const FRAG = `
 uniform vec3 uColor;
 uniform float uOpacity;
@@ -29,11 +31,12 @@ uniform float uStripe;
 varying float vDist;
 varying vec3 vWorld;
 void main() {
-  float fade = 1.0 - vDist * 0.55;
-  float edge = smoothstep(0.9, 1.0, vDist) * 0.9;
-  float scan = 0.82 + 0.18 * sin(vDist * 46.0 - uTime * 5.0);
-  float stripe = mix(1.0, step(0.5, fract((vWorld.x + vWorld.z) * 2.2)), uStripe);
-  gl_FragColor = vec4(uColor * 1.35, uOpacity * (fade * scan + edge) * stripe);
+  float band = 0.5 + 0.5 * step(0.5, fract(vDist * 5.0 - uTime * 0.7));
+  float fade = 1.0 - 0.45 * step(0.5, vDist) - 0.2 * step(0.8, vDist);
+  float hatch = max(step(0.7, fract((vWorld.x + vWorld.z) * 2.6)), step(0.7, fract((vWorld.x - vWorld.z) * 2.6)));
+  float fill = mix(band * fade, hatch * 0.9, uStripe);
+  float rim = step(0.95, vDist);
+  gl_FragColor = vec4(uColor * (1.0 + rim * 0.6), min(1.0, uOpacity * fill + rim * 0.75));
 }`;
 
 function makeLayer(opacity, stripe, y) {
@@ -60,9 +63,17 @@ function makeLayer(opacity, stripe, y) {
 }
 
 export function createCone(parent) {
-  const low = makeLayer(0.36, 0, 0.05);
-  const high = makeLayer(0.2, 1, 0.045);
-  parent.add(high.mesh, low.mesh);
+  const low = makeLayer(0.42, 0, 0.05);
+  const high = makeLayer(0.5, 1, 0.045);
+  // hard inked outline around the whole cone
+  const outlinePos = new Float32Array((RAYS + 3) * 3);
+  const outlineGeo = new THREE.BufferGeometry();
+  outlineGeo.setAttribute('position', new THREE.BufferAttribute(outlinePos, 3));
+  const outlineMat = new THREE.LineBasicMaterial({ color: 0x19f0e0, transparent: true, opacity: 0.95, depthWrite: false });
+  const outline = new THREE.Line(outlineGeo, outlineMat);
+  outline.frustumCulled = false;
+  outline.renderOrder = 6;
+  parent.add(high.mesh, low.mesh, outline);
   const color = new THREE.Color();
 
   const fill = (layer, room, pose, vis, coverBlocks) => {
@@ -94,16 +105,25 @@ export function createCone(parent) {
       if (alert) color.copy(HOT);
       else if (meter < 0.5) color.copy(CALM).lerp(WARY, meter * 2);
       else color.copy(WARY).lerp(HOT, (meter - 0.5) * 2);
+      outlinePos.set(high.pos.subarray(0, 3), 0);
+      outlinePos.set(high.pos.subarray(3), 3);
+      outlinePos.set(high.pos.subarray(0, 3), (RAYS + 2) * 3);
+      for (let i = 1; i < outlinePos.length; i += 3) outlinePos[i] = 0.06;
+      outlineGeo.attributes.position.needsUpdate = true;
+      outlineMat.color.copy(color);
       for (const l of [low, high]) {
         l.mat.uniforms.uColor.value.copy(color);
         l.mat.uniforms.uTime.value = t;
-        l.mat.uniforms.uOpacity.value = l.base * (1 + meter * 0.9);
+        l.mat.uniforms.uOpacity.value = l.base * (1 + meter * 0.8);
       }
     },
     setVisible(v) {
-      low.mesh.visible = high.mesh.visible = v;
+      low.mesh.visible = high.mesh.visible = outline.visible = v;
     },
     dispose() {
+      outline.removeFromParent();
+      outlineGeo.dispose();
+      outlineMat.dispose();
       for (const l of [low, high]) {
         l.mesh.removeFromParent();
         l.geo.dispose();
