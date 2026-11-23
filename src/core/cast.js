@@ -12,22 +12,22 @@
 export const ARCHETYPES = {
   enforcer: {
     name: 'Heavy Enforcer',
-    build: { shoulders: 0.275, bulk: 1.28, belly: 0.06, height: 1.07, head: 0.98, slouch: 0.02, jaw: 1.18 },
+    build: { shoulders: 0.285, bulk: 1.26, belly: 0.05, height: 1.07, head: 0.98, slouch: 0.02, jaw: 1.2, taper: 0.96 },
     hats: ['none', 'none', 'beanie', 'fedora'],
     eyewear: ['shades', 'shades', 'none'],
     props: ['flashlight', 'flashlight', 'baton'],
-    coat: [0.5, 0.62, 0],
-    vest: 0.5,
+    coat: [0.55, 0.64, 0.5],
+    vest: 0.4,
     tie: 0,
     mustache: 0.3,
     beard: 0.35,
   },
   watchman: {
     name: 'Night Watchman',
-    build: { shoulders: 0.215, bulk: 1.02, belly: 0.2, height: 0.97, head: 1.02, slouch: 0.13, jaw: 1 },
+    build: { shoulders: 0.215, bulk: 1.02, belly: 0.13, height: 0.97, head: 1.03, slouch: 0.13, jaw: 1, taper: 1.08 },
     hats: ['cap', 'cap', 'cap', 'none'],
     eyewear: ['none', 'none', 'glasses'],
-    props: ['thermos', 'keys', 'flashlight'],
+    props: ['mug', 'mug', 'keys', 'flashlight'],
     coat: [0, 0, 0.3],
     vest: 0,
     tie: 0.6,
@@ -36,7 +36,7 @@ export const ARCHETYPES = {
   },
   tech: {
     name: 'Tech Specialist',
-    build: { shoulders: 0.21, bulk: 0.94, belly: 0, height: 1.0, head: 1.0, slouch: 0.03, jaw: 0.95 },
+    build: { shoulders: 0.22, bulk: 0.94, belly: 0, height: 1.0, head: 1.0, slouch: 0.03, jaw: 0.95, taper: 0.86 },
     hats: ['visor', 'visor', 'visor', 'headset'],
     eyewear: ['none'],
     props: ['scanner', 'scanner', 'tablet'],
@@ -48,7 +48,7 @@ export const ARCHETYPES = {
   },
   gala: {
     name: 'Gala Security',
-    build: { shoulders: 0.235, bulk: 1.0, belly: 0, height: 1.04, head: 0.98, slouch: 0, jaw: 1.03 },
+    build: { shoulders: 0.245, bulk: 1.0, belly: 0, height: 1.04, head: 0.98, slouch: -0.02, jaw: 1.03, taper: 0.84 },
     hats: ['none', 'none', 'none', 'fedora'],
     eyewear: ['shades', 'none', 'none'],
     props: ['earpiece', 'earpiece', 'radio'],
@@ -60,11 +60,11 @@ export const ARCHETYPES = {
   },
   tactical: {
     name: 'Tactical Officer',
-    build: { shoulders: 0.245, bulk: 1.1, belly: 0, height: 1.03, head: 0.98, slouch: -0.03, jaw: 1.08 },
+    build: { shoulders: 0.255, bulk: 1.1, belly: 0, height: 1.03, head: 0.98, slouch: -0.04, jaw: 1.08, taper: 0.9 },
     hats: ['beret', 'beret', 'cap', 'helmet'],
     eyewear: ['none', 'none', 'shades'],
     props: ['radio', 'baton', 'flashlight'],
-    coat: [0.66, 0.4, 0.4],
+    coat: [0.7, 0.62, 0.55],
     vest: 0.35,
     tie: 0,
     mustache: 0.35,
@@ -137,11 +137,11 @@ export const HAIR_STYLES = ['short', 'slick', 'buzz', 'bald', 'curly', 'bob', 'b
 export function thiefLook() {
   return {
     role: 'thief',
-    build: { shoulders: 0.225, bulk: 1.0, belly: 0, height: 1.0, head: 0.98, slouch: 0.02, jaw: 0.96 },
+    build: { shoulders: 0.24, bulk: 1.0, belly: 0, height: 1.0, head: 0.98, slouch: 0.02, jaw: 0.96, taper: 0.76 },
     suit: 0x171920,
     suitShade: 0x0a0b10,
     highlight: 0x6f86bf,
-    ink: 0x3a4a78, // the outline itself is the rim light, so black reads on black
+    ink: 0x232c48, // a deep slate outline; the bright rim light is painted on the lit edge
     eyes: 0xf2f5fb,
   };
 }
@@ -167,6 +167,7 @@ export function guardLook(themeId, rng) {
       head: a.build.head,
       slouch: a.build.slouch,
       jaw: jitter(a.build.jaw, 0.05),
+      taper: a.build.taper,
     },
     skin: rng.pick(SKIN_TONES),
     hair: rng.pick(HAIR_COLORS),
@@ -182,6 +183,11 @@ export function guardLook(themeId, rng) {
     vest: rng.chance(a.vest),
     tie: rng.chance(a.tie),
     epaulettes: archId === 'tactical' || (archId === 'watchman' && rng.chance(0.5)),
+    // archetype signatures
+    weary: archId === 'watchman', // half-lidded eyes, tilted cap
+    lapels: archId === 'enforcer' || archId === 'gala', // sharp open lapels
+    collar: archId === 'tactical', // high popped greatcoat collar
+    beacon: archId === 'tech', // shoulder beacon and collar tubing
     top,
     bottom,
     accent,

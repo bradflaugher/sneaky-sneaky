@@ -12,6 +12,8 @@ import { generateRoom } from '../core/generator.js';
 import { poseAt, angDiff } from '../core/patrol.js';
 import { canSee, canChoke, isBumping, detectRate, rankFor } from '../core/stealth.js';
 import { THEMES, THEME_IDS } from '../core/themes.js';
+import { crawlRoute, pointAlong } from '../core/ducts.js';
+import { VENT_COLORS } from '../render/themeArt.js';
 import { resolveMods, tierFor, describeRun, describeSetup, setupFromParams, setupToParams, normalizeSetup } from '../core/difficulty.js';
 
 import { buildWorld } from '../render/world.js';
@@ -42,7 +44,7 @@ const AWAKE = new Set(['patrol', 'suspicious', 'investigate', 'look', 'return'])
 const TIPS = [
   'Crouch behind waist-high cover and their cones pass right over you.',
   'Knock to lure a guard over, then slip past where they were.',
-  'Glowing vents link rooms. Crawl through to skip the long way round.',
+  'Follow the ductwork overhead: each vent comes out where its duct ends.',
   'Red beams mean find the switch, or find a vent around them.',
   'Sneak up directly behind a guard for a sleeper hold. Ghosts skip this.',
 ];
@@ -279,8 +281,8 @@ export class Game {
     const loot = room.loot.info;
     const theme = THEMES[room.themeId];
     const tag = this.runLabel();
-    if (!this.player.hasLoot) this.ui.setObjective({ tag, text: `Steal: ${loot.name}`, sub: `${theme.name} · ${room.venue}` });
-    else this.ui.setObjective({ tag, text: 'Reach the extraction pad', sub: `Carrying: ${loot.name}`, done: true });
+    if (!this.player.hasLoot) this.ui.setObjective({ tag, text: `${loot.mission.verb}: ${loot.name}`, sub: `${theme.name} · ${room.venue}` });
+    else this.ui.setObjective({ tag, text: 'Reach the extraction pad', sub: `${loot.mission.carrying}: ${loot.name}`, done: true });
   }
 
   // ------------------------------------------------------------ flow
@@ -357,7 +359,7 @@ export class Game {
     const tip = TIPS[this.run.roomNo - 1];
     // A quick lower-third strip that gets out of the way: tips linger a touch longer.
     const tipNow = this.run.roomNo <= TIPS.length && this.setup.start === 'compact' ? tip : null;
-    this.ui.banner(`ISSUE #${String(this.run.roomNo).padStart(2, '0')} · ${room.venue}`, loot.name, tipNow || loot.tagline, tipNow ? 3.4 : 1.8);
+    this.ui.banner(`ISSUE #${String(this.run.roomNo).padStart(2, '0')} · ${room.venue}`, `${loot.mission.verb}: ${loot.name}`, tipNow || loot.tagline, tipNow ? 3.4 : 1.8);
     this.ui.hintKeys();
   }
 
@@ -565,7 +567,7 @@ export class Game {
     }
 
     if (this.state !== 'paused' && !(this.state === 'setup' && !this.attract)) {
-      this.world.update(t, dt, this.camera.position);
+      this.world.update(t, dt, this.camera.position, this.player);
       this.fx.update(dt);
     }
     if (this.state === 'playing' || this.state === 'failed') this.drawHud(t);
@@ -651,8 +653,13 @@ export class Game {
       const v = p.vent;
       v.t += dt;
       const k = Math.min(1, v.t / v.dur);
-      p.x = v.from.x + (v.to.x - v.from.x) * k;
-      p.z = v.from.z + (v.to.z - v.from.z) * k;
+      // ease in and out, following the duct's own route: up the riser, along
+      // the overhead run, round the elbow and down to the far grate
+      const e = k * k * (3 - 2 * k);
+      const pos = pointAlong(v.route, e);
+      p.x = pos.x;
+      p.z = pos.z;
+      this.world.setVentPulse(k < 1 ? pos : null, v.color);
       v.clank -= dt;
       if (v.clank <= 0) {
         v.clank = 0.26;
@@ -666,8 +673,9 @@ export class Game {
         p.ang = Math.atan2(-v.to.dy, -v.to.dx);
         rig.root.visible = true;
         settleCharacter(rig, { mode: 'normal', crouch: true, speed: 0 });
-            this.audio.ventOpen();
+        this.audio.ventOpen();
         this.fx.ring(p.x, p.z, 0x9fe8ff, 1.2, 0.5);
+        this.fx.stamp('CLANK!', '#f4efe2', p.x, 1.6, p.z, 0.6, 0.9);
       }
       this.ui.setAction(null);
       this.fx.setPrompt(null);
@@ -780,7 +788,7 @@ export class Game {
     }
     if (best) return { type: 'choke', label: 'CHOKE', text: 'SLEEPER HOLD', guard: best, ring: { x: best.pose.x, z: best.pose.z, r: 0.62 }, color: 0xffb347 };
     if (!p.hasLoot && Math.hypot(p.x - room.loot.x, p.z - room.loot.z) < 1.45)
-      return { type: 'grab', label: 'GRAB', text: 'GRAB THE LOOT', ring: { x: room.loot.x, z: room.loot.z, r: 0.75 }, color: 0xffd27a };
+      return { type: 'grab', label: room.loot.info.mission.verb, text: `${room.loot.info.mission.verb} THE TARGET`, ring: { x: room.loot.x, z: room.loot.z, r: 0.75 }, color: 0xffd27a };
     for (const s of room.switches) {
       if (!this.lasers[s.laser]) continue;
       if (Math.hypot(p.x - (s.cx + 0.5 + s.dx * 0.3), p.z - (s.cy + 0.5 + s.dy * 0.3)) < 1.05)
@@ -817,14 +825,14 @@ export class Game {
       this.fx.stamp('SHHH...', '#f4efe2', g.pose.x, 2.5, g.pose.z, 0.7, 1.0);
     } else if (ctx.type === 'grab') {
       p.hasLoot = true;
-      this.world.setLootTaken(true);
+      this.world.setLootTaken(true, !this.room.loot.info.mission.takes);
       this.world.setExitActive(true);
       this.audio.chime();
       this.fx.burst(this.room.loot.x, 1.3, this.room.loot.z, 0xffd27a, 22);
-      this.fx.stamp('YOINK!', '#ffd27a', this.room.loot.x, 2.1, this.room.loot.z, 0.6, 1.3, '#c1121f');
+      this.fx.stamp(this.room.loot.info.mission.sfx, '#ffd27a', this.room.loot.x, 2.1, this.room.loot.z, 0.6, 1.3, '#c1121f');
       this.fx.ring(this.room.exit.x, this.room.exit.z, 0x5aff9a, 3, 1.4);
       this.updateObjective();
-      this.ui.banner(`${this.room.loot.info.rarity} · ${this.room.loot.info.serial}`, this.room.loot.info.name, 'Extraction pad is live. Get out clean.', 1.8);
+      this.ui.banner(`${this.room.loot.info.mission.past} · ${this.room.loot.info.serial}`, this.room.loot.info.name, 'Extraction pad is live. Get out clean.', 1.8);
     } else if (ctx.type === 'switch') {
       const i = ctx.sw.laser;
       this.lasers[i] = false;
@@ -836,7 +844,8 @@ export class Game {
       p.vent = {
         i: ctx.i,
         reverse: ctx.reverse,
-        from: { x: ctx.from.cx + 0.5, z: ctx.from.cy + 0.5 },
+        route: crawlRoute(this.room, this.room.vents[ctx.i], ctx.reverse),
+        color: VENT_COLORS[ctx.i % VENT_COLORS.length],
         to: { x: ctx.to.cx + 0.5, z: ctx.to.cy + 0.5, dx: ctx.to.dx, dy: ctx.to.dy },
         t: 0,
         dur: ctx.time,
@@ -846,6 +855,7 @@ export class Game {
       p.speed = 0;
       this.playerRig.root.visible = false;
       this.audio.ventOpen();
+      this.fx.stamp('CLANK!', '#ffd23a', p.x, 1.7, p.z, 0.7, 1.0, '#0b0d12');
     }
   }
 

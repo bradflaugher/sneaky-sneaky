@@ -106,6 +106,7 @@ export class UI {
     const btn = $('btn-action');
     btn.classList.toggle('ready', !!a);
     btn.classList.toggle('choke', !!a && a.label === 'CHOKE');
+    btn.classList.toggle('long', !!a && a.label.length > 8);
     $('btn-action-label').textContent = a ? a.label : 'ACTION';
     const p = $('prompt');
     p.classList.toggle('on', !!a);
@@ -166,10 +167,11 @@ export class UI {
     const r = $('rank');
     r.textContent = rank;
     r.className = `rank ${rank}`;
+    $('clear-got').textContent = loot.mission ? loot.mission.past : 'ACQUIRED';
     $('clear-loot').textContent = loot.name;
     $('clear-tag').textContent = `${loot.rarity} · ${loot.serial}`;
     $('clear-tag').className = `meta-line rarity-${loot.rarity}`;
-    $('clear-flavor').textContent = `${loot.tagline} Lifted from ${venue}.`;
+    $('clear-flavor').textContent = `${loot.tagline} ${venue}.`;
     $('st-time').textContent = fmtTime(time);
     $('st-par').textContent = fmtTime(par);
     $('st-ko').textContent = String(knockouts);
@@ -184,7 +186,7 @@ export class UI {
     };
     if (ghost) badge('👻 GHOST BONUS', false);
     if (ghost && closeCalls === 0) badge('NEVER EVEN A "?"', false);
-    if (isNew) badge(loot.rarity === 'SIGNATURE' ? 'SIGNATURE PIECE' : 'NEW IN VAULT', true);
+    if (isNew) badge(loot.rarity === 'SIGNATURE' ? 'SIGNATURE CASE' : 'NEW CASE FILE', true);
     if (streak > 1) badge(`${streak} ROOM STREAK`, true);
     this.show('clear');
   }
@@ -194,8 +196,8 @@ export class UI {
     const sum = vaultSummary(save);
     const all = vaultEntries(save);
     const s = save.stats;
-    $('vault-count').textContent = `${sum.unique} unique ${sum.unique === 1 ? 'trophy' : 'trophies'}`;
-    $('vault-stats').textContent = `${sum.heists} heists pulled · ${sum.by.SIGNATURE} / ${sum.signatureTotal} signature pieces · ${s.ghosts} ghost runs · best streak ${s.bestStreak} · ${s.knockouts} naps administered`;
+    $('vault-count').textContent = `${sum.unique} case ${sum.unique === 1 ? 'file' : 'files'} closed`;
+    $('vault-stats').textContent = `${sum.heists} missions run · ${sum.by.SIGNATURE} / ${sum.signatureTotal} signature cases · ${s.ghosts} ghost runs · best streak ${s.bestStreak} · ${s.knockouts} naps administered`;
     const list = $('vault-list');
     const filters = $('vault-filters');
     const PAGE = 36;
@@ -221,12 +223,12 @@ export class UI {
       }
       const items = filter === 'ALL' ? all : all.filter((e) => e.rarity === filter);
       list.textContent = '';
-      if (!items.length) list.append(el('div', 'vault-empty', all.length ? 'Nothing filed under that yet.' : 'Empty shelves. Everything out there is still poorly guarded.'));
+      if (!items.length) list.append(el('div', 'vault-empty', all.length ? 'Nothing filed under that yet.' : 'No case files yet. Everything out there is still poorly guarded.'));
       const frag = document.createDocumentFragment();
       for (const e of items.slice(0, shown)) {
         const d = el('div', `vault-item rarity-${e.rarity}`);
         d.append(el('span', 'rar', e.rarity), el('b', '', e.name), el('span', 'tagline', e.tagline || ''));
-        const where = [e.serial, e.sector ? `SECTOR ${String(e.sector).padStart(2, '0')}` : '', `BEST ${e.best}`, e.count > 1 ? `×${e.count}` : ''].filter(Boolean).join(' · ');
+        const where = [e.verb || 'RECOVERED', e.serial, e.sector ? `SECTOR ${String(e.sector).padStart(2, '0')}` : '', `BEST ${e.best}`, e.count > 1 ? `×${e.count}` : ''].filter(Boolean).join(' · ');
         d.append(el('span', 'meta', where));
         if (e.venue) d.append(el('span', 'venue', e.venue));
         frag.append(d);

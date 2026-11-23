@@ -1,6 +1,11 @@
 // The loot.
 //
 // Two sources, mixed every room:
+// These are mission TARGETS, not just loot. The agent is a pacifist spy, and
+// each room rolls an assignment: photograph it, decrypt it, rescue it, swap
+// it, verify it... (see MISSION_VERBS). Mechanically it is always "sneak to
+// the pedestal, interact, extract".
+//
 //   SIGNATURE  – the handcrafted classics below, each with its own bespoke prop
 //   procedural – an endless supply assembled from word banks:
 //                [Owner] [Adjective] [Material] [Object] [(Tag)]
@@ -282,6 +287,44 @@ const NOUN_TAGLINES = [
 
 const TOPPERS = ['none', 'none', 'none', 'ribbon', 'tag', 'bow', 'evidence'];
 
+// ------------------------------------------------------------------ missions
+// What the agent is actually there to do. `takes` is whether the object
+// leaves with you; intel and tinker jobs leave it on its pedestal.
+
+export const MISSION_CATEGORIES = {
+  intel: { name: 'Intel / Recon', takes: false },
+  recovery: { name: 'Recovery / Rescue', takes: true },
+  tinker: { name: 'Pacifist Tinker / Swap', takes: false },
+};
+export const MISSION_VERBS = [
+  { verb: 'PHOTOGRAPH', past: 'PHOTOGRAPHED', category: 'intel', sfx: 'CLICK!', carrying: 'Photos in hand' },
+  { verb: 'COPY', past: 'COPIED', category: 'intel', sfx: 'ZIP!', carrying: 'Copy made' },
+  { verb: 'DECRYPT', past: 'DECRYPTED', category: 'intel', sfx: 'BEEP!', carrying: 'Decrypted' },
+  { verb: 'SCAN', past: 'SCANNED', category: 'intel', sfx: 'BLIP!', carrying: 'Scan complete' },
+  { verb: 'RETRIEVE', past: 'RETRIEVED', category: 'recovery', sfx: 'YOINK!', carrying: 'Carrying' },
+  { verb: 'RESCUE', past: 'RESCUED', category: 'recovery', sfx: 'GOTCHA!', carrying: 'Escorting' },
+  { verb: 'RECOVER', past: 'RECOVERED', category: 'recovery', sfx: 'YOINK!', carrying: 'Carrying' },
+  { verb: 'RETURN', past: 'RETURNED', category: 'recovery', sfx: 'GOT IT!', carrying: 'Returning' },
+  { verb: 'SWAP', past: 'SWAPPED', category: 'tinker', sfx: 'SWITCH!', carrying: 'Swapped for a decoy' },
+  { verb: 'RECALIBRATE', past: 'RECALIBRATED', category: 'tinker', sfx: 'TWEAK!', carrying: 'Recalibrated' },
+  { verb: 'VERIFY', past: 'VERIFIED', category: 'tinker', sfx: 'CHECK!', carrying: 'Verified' },
+  { verb: 'INSPECT', past: 'INSPECTED', category: 'tinker', sfx: 'HMM!', carrying: 'Inspected' },
+];
+// Some objects suit some jobs: you decrypt a floppy, you rescue a frog.
+const SHAPE_BIAS = {
+  intel: ['floppy', 'tape', 'typewriter', 'radio', 'phone', 'case', 'cube', 'globe', 'bust'],
+  recovery: ['duck', 'frog', 'gnome', 'cactus', 'trophy', 'crown', 'urn', 'teapot', 'jar', 'croissant', 'wheel', 'pin', 'house'],
+  tinker: ['toaster', 'espresso', 'clock', 'lamp', 'lava', 'stapler', 'bottle', 'mug', 'hydrant', 'cone', 'lighthouse', 'rook'],
+};
+
+/** Roll the assignment for a target. Deterministic for a given rng. */
+export function rollMission(rng, shape) {
+  const cats = Object.keys(MISSION_CATEGORIES);
+  const category = rng.weighted(cats, (c) => (SHAPE_BIAS[c].includes(shape) ? 4 : 1));
+  const m = rng.pick(MISSION_VERBS.filter((v) => v.category === category));
+  return { ...m, takes: MISSION_CATEGORIES[category].takes };
+}
+
 /** Every base silhouette lootProps.js must know how to build. */
 export const PROP_SHAPES = [...new Set(NOUNS.map((n) => n.shape))];
 
@@ -309,11 +352,13 @@ export function generateLoot(rng, themeId) {
   // ---- signature drop: one of the handcrafted classics, bespoke prop
   if (rng.chance(SIGNATURE_CHANCE)) {
     const item = rng.weighted(LOOT, (l) => (l.themes === null ? 2 : l.themes.includes(themeId) ? 5 : 0.35));
+    const serial = serialOf(rng);
     return {
+      mission: rollMission(rng, item.prop),
       id: item.id,
       name: item.name,
       tagline: item.flavor,
-      serial: serialOf(rng),
+      serial,
       rarity: 'SIGNATURE',
       signature: true,
       parts: null,
@@ -355,11 +400,13 @@ export function generateLoot(rng, themeId) {
 
   const short = noun.t.toLowerCase();
   const tagline = rng.chance(0.4) ? rng.pick(NOUN_TAGLINES)(short) : rng.pick(TAGLINES);
+  const serial = serialOf(rng);
   return {
+    mission: rollMission(rng, noun.shape),
     id: `p-${slugHash(name)}`,
     name,
     tagline,
-    serial: serialOf(rng),
+    serial,
     rarity,
     signature: false,
     parts: { owner, adjective: adj.t, material: material ? material.t : null, noun: noun.t, tag },

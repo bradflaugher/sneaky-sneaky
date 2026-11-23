@@ -37,7 +37,7 @@ const lift = (hex, k) => {
  * standing still. `alt` picks between the two frames of two-frame poses.
  * Positive limb angles swing backwards, negative forwards.
  */
-export function jointPose(mode, crouch, walk = -1, alt = 0) {
+export function jointPose(mode, crouch, walk = -1, alt = 0, stance = 'guard') {
   const moving = walk >= 0;
   const ph = moving ? (walk / WALK_FRAMES) * Math.PI * 2 : 0;
   const amp = moving ? 1 : 0;
@@ -66,6 +66,15 @@ export function jointPose(mode, crouch, walk = -1, alt = 0) {
     T.aLx = Math.sin(ph) * 0.62 * amp;
     T.aRx = -Math.sin(ph) * 0.62 * amp;
     T.eL = T.eR = -0.25 - amp * 0.6;
+  }
+  if (!moving && !crouch) {
+    // nobody stands like a mannequin: weight on one leg, elbows and knees soft
+    Object.assign(T, { torsoRY: 0.14, aLz: 0.16, aRz: 0.13, aLx: 0.1, aRx: -0.12, eL: -0.38, eR: -0.52, lLx: -0.07, lRx: 0.06, kL: 0.12, kR: 0.1, lz: 0.07 });
+    // the thief never fully relaxes: coiled, low, ready to move
+    if (stance === 'thief') Object.assign(T, { py: 0.87, torsoRX: 0.17, headRX: -0.1, torsoRY: 0.2, aLx: -0.22, aRx: 0.14, eL: -0.95, eR: -0.78, aLz: 0.22, aRz: 0.2, lLx: -0.3, kL: 0.42, lRx: 0.12, kR: 0.3, lz: 0.09 });
+  } else if (moving && !crouch && stance === 'thief') {
+    T.torsoRX += 0.1;
+    T.eL = T.eR = -1.05;
   }
   if (mode === 'choking') {
     Object.assign(T, { aLx: -1.45, aRx: -1.25, eL: -1.5, eR: -1.6, aLz: -0.2, aRz: -0.15, torsoRX: 0.24, py: 0.84, lLx: -0.3, kL: 0.5, lRx: 0.25, kR: 0.3 });
@@ -220,6 +229,26 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
   if (st.thief) {
     // a plain black mask: no hair, no face, just eyes
     inkFill(g, st, ell(g, hx + fx * 0.04 * r, hy, r * 0.93, r * 1.06), look.suit, { r, fold: 0.26 });
+    g.save();
+    ell(g, hx + fx * 0.04 * r, hy, r * 0.93, r * 1.06)();
+    g.clip();
+    if (fz > -0.2) {
+      // the eye opening: a slightly lighter band, so the eyes sit in something
+      g.beginPath();
+      g.ellipse(hx + fx * 0.5 * r, hy + 0.03 * r, r * (0.42 + 0.42 * Math.max(0, fz)), r * 0.2, 0, 0, Math.PI * 2);
+      g.fillStyle = css(scale(look.suit, 2.0));
+      g.fill();
+      g.strokeStyle = st.rim;
+      g.globalAlpha = 0.5;
+      g.lineWidth = lw * 0.6;
+      g.stroke();
+      g.globalAlpha = 1;
+    } else {
+      g.globalAlpha = 0.4;
+      line(g, st, [hx, hy - r, hx - fx * 0.1 * r, hy + r], 0.6, st.rim);
+      g.globalAlpha = 1;
+    }
+    g.restore();
     for (const e of [1, -1]) {
       const depth = fz * 0.85 - e * fx * 0.4;
       if (depth < 0.14) continue;
@@ -240,8 +269,8 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
 
   const skin = look.skin;
   const hair = look.hair;
-  const covered = look.hat === 'visor' || look.hat === 'helmet';
-  const bald = look.hairStyle === 'bald' || covered;
+  const covered = look.hat === 'visor'; // a full helmet: no face at all
+  const bald = look.hairStyle === 'bald' || covered || look.hat === 'helmet';
   const jaw = look.build.jaw || 1;
 
   // ---- hair mass behind the head
@@ -259,7 +288,15 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
     if (depth < -0.45 || covered) continue;
     const exx = hx + (e * 0.9 * fz - 0.12 * fx) * r;
     inkFill(g, st, ell(g, exx, hy + 0.08 * r, r * 0.16, r * 0.24), skin, { r: r * 0.2, hl: false });
-    if (look.prop === 'earpiece' && e === 1) line(g, st, [exx, hy + 0.2 * r, exx - 0.1 * r, hy + 0.7 * r, exx + 0.05 * r, hy + 1.15 * r], 0.7);
+    if (look.prop === 'earpiece' && e === 1) {
+      // a coiled earpiece wire running down behind the collar
+      g.beginPath();
+      g.moveTo(exx, hy + 0.2 * r);
+      for (let i = 1; i <= 10; i++) g.lineTo(exx - 0.06 * r + (i % 2 ? 0.09 : -0.03) * r, hy + (0.2 + i * 0.1) * r);
+      g.strokeStyle = st.ink;
+      g.lineWidth = lw * 0.7;
+      g.stroke();
+    }
   }
 
   const headPath = () => {
@@ -273,6 +310,20 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
   const faceVisible = fz > -0.3;
   if (bald || faceVisible) {
     inkFill(g, st, headPath, covered ? look.top : skin, { r, fold: 0.24 });
+    if (!covered && !st.holo) {
+      // a hard cel shadow plane down the side of the face away from the light
+      g.save();
+      headPath();
+      g.clip();
+      g.fillStyle = css(scale(skin, 0.74));
+      g.beginPath();
+      g.ellipse(hx + 0.95 * r, hy + 0.3 * r, r * 0.62, r * 1.25, -0.2, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.ellipse(hx + fx * 0.2 * r, hy + 1.2 * r, r * 0.8, r * 0.34, 0, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+    }
     if (!bald) {
       // hairline: a cap over the forehead plus the side nearest the back of the head
       g.save();
@@ -335,9 +386,23 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
         g.fillStyle = st.ink;
         g.fill();
       }
+      if (look.weary && mood === 'calm' && look.eyewear !== 'shades') {
+        // heavy lids and a bag under the eye: it has been a long shift
+        g.beginPath();
+        g.ellipse(ex, ey - 0.045 * r, w * 1.05, 0.06 * r, 0, Math.PI, 0);
+        g.closePath();
+        g.fillStyle = css(scale(skin, 0.8));
+        g.fill();
+        line(g, st, [ex - w, ey - 0.02 * r, ex + w, ey - 0.02 * r], 0.8);
+        g.beginPath();
+        g.arc(ex, ey + 0.1 * r, w * 0.8, 0.3, Math.PI - 0.3);
+        g.strokeStyle = 'rgba(11,13,18,0.45)';
+        g.lineWidth = lw * 0.5;
+        g.stroke();
+      }
       // brows carry the expression
       const raise = mood === 'alert' ? 0.16 : mood === 'wary' && e === 1 ? 0.12 : 0;
-      const stern = mood === 'calm' || mood === 'wary' ? 0.06 : -0.02;
+      const stern = look.weary && mood === 'calm' ? -0.06 : mood === 'calm' || mood === 'wary' ? (look.archetype === 'tactical' ? 0.1 : 0.06) : -0.02;
       if (mood !== 'sleep') line(g, st, [ex - e * 0.2 * r, ey - (0.2 + raise) * r - stern * r, ex + e * 0.16 * r, ey - (0.17 + raise) * r + stern * r], 1.25, css(scale(hair, 0.7)));
     }
     // nose: a full profile wedge side-on, a small tick head-on
@@ -371,6 +436,15 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
       g.lineWidth = lw * 0.6;
       g.stroke();
     }
+    if (look.archetype === 'tactical' && !st.holo) {
+      // a stern band of shadow under the brow
+      g.save();
+      headPath();
+      g.clip();
+      g.fillStyle = 'rgba(11,13,18,0.3)';
+      g.fillRect(hx - r * 1.2, hy - 0.2 * r, r * 2.4, 0.2 * r);
+      g.restore();
+    }
     // eyewear
     if (eyes.length && look.eyewear === 'shades') {
       const x0 = Math.min(...eyes) - 0.22 * r;
@@ -396,6 +470,13 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
   const hat = look.hat;
   const hatCol = hat === 'beret' || hat === 'beanie' ? look.accent : scale(look.top, 0.62);
   if (hat === 'cap') {
+    g.save();
+    if (look.weary) {
+      // pushed back and tilted
+      g.translate(hx, hy);
+      g.rotate(-0.16);
+      g.translate(-hx, -hy);
+    }
     const crown = () => {
       g.beginPath();
       g.ellipse(hx - fx * 0.04 * r, hy - 0.42 * r, r * 1.0, r * 0.74, 0, Math.PI, 0);
@@ -404,6 +485,7 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
     if (fz > -0.5) inkFill(g, st, ell(g, hx + fx * 0.8 * r, hy - 0.4 * r, r * (0.42 + 0.5 * Math.max(0, fz)), r * 0.15), scale(hatCol, 0.7), { r: r * 0.3, hl: false });
     inkFill(g, st, crown, hatCol, { r, fold: 0.22 });
     if (fz > 0.3) inkFill(g, st, ell(g, hx + fx * 0.5 * r, hy - 0.7 * r, r * 0.13, r * 0.14), 0xe0b040, { r: r * 0.2, hl: false });
+    g.restore();
   } else if (hat === 'beret') {
     inkFill(g, st, ell(g, hx - 0.14 * r, hy - 0.74 * r, r * 1.08, r * 0.46, -0.2), hatCol, { r, fold: 0.22 });
     line(g, st, [hx - 0.1 * r, hy - 1.18 * r, hx - 0.06 * r, hy - 1.3 * r], 1.1);
@@ -442,21 +524,6 @@ function drawHead(g, st, hx, hy, r, yaw, look, mood) {
     };
     inkFill(g, st, dome, scale(look.top, 0.8), { r, fold: 0.22 });
     line(g, st, [hx - fx * 0.2 * r - 0.8 * r, hy - 0.02 * r, hx + fx * 0.2 * r, hy + 0.95 * r], 0.7);
-    if (fz > -0.3) {
-      // the face shows under the rim
-      for (const e of [1, -1]) {
-        const depth = fz * 0.85 - e * fx * 0.4;
-        if (depth < 0.12) continue;
-        g.beginPath();
-        g.ellipse(hx + (fx * 0.52 + e * 0.34 * fz) * r, hy + 0.2 * r, 0.12 * r, 0.07 * r, 0, 0, Math.PI * 2);
-        g.fillStyle = '#f6f2e8';
-        g.fill();
-        g.strokeStyle = st.ink;
-        g.lineWidth = lw * 0.6;
-        g.stroke();
-      }
-      line(g, st, [hx + fx * 0.5 * r - 0.2 * r * fz, hy + 0.64 * r, hx + fx * 0.5 * r + 0.2 * r * fz, hy + 0.62 * r], 0.85);
-    }
   } else if (hat === 'visor') {
     inkFill(g, st, ell(g, hx, hy - 0.02 * r, r * 1.04, r * 1.1), lift(look.top, 0.1), { r, fold: 0.24 });
     if (fz > -0.25) {
@@ -509,30 +576,66 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
     for (const [a, bb, ra, rb, color, opt] of parts) inkFill(g, st, () => capsule(g, a, bb, ra, rb), color, { r: Math.max(ra, rb), noInk: true, hl: !thief, ...opt });
   };
 
+  const foldInk = st.holo ? null : thief ? st.rim : 'rgba(11,13,18,0.5)';
+  /** Two short inked creases on the inside of a bent joint. J: joint, A: the point before it. */
+  const crease = (J, A, r) => {
+    if (!foldInk) return;
+    const ang = Math.atan2(J.y - A.y, J.x - A.x);
+    const nx = -Math.sin(ang);
+    const ny = Math.cos(ang);
+    const ux = Math.cos(ang);
+    const uy = Math.sin(ang);
+    g.globalAlpha = thief ? 0.55 : 1;
+    for (const o of [-0.4, 0.2]) line(g, st, [J.x + nx * r * 0.75 + ux * r * o, J.y + ny * r * 0.75 + uy * r * o, J.x + nx * r * 0.05 + ux * r * (o + 0.3), J.y + ny * r * 0.05 + uy * r * (o + 0.3)], 0.55, foldInk);
+    g.globalAlpha = 1;
+  };
+
   const drawLeg = (L) => {
     const Hp = pr(L.Hp);
     const K = pr(L.K);
     const A = pr(L.A);
     const toe = pr(L.toe);
     chain([
-      [K, A, R(0.07), R(0.05), bottom],
-      [Hp, K, R(0.1), R(0.074), bottom],
+      [K, A, R(0.074), R(0.046), bottom],
+      [Hp, K, R(0.108), R(0.072), bottom],
     ]);
-    // a proper comic boot: heel, sole and a rounded toe
+    crease(K, Hp, R(0.072));
+    // a fitted boot: cuff, heel, rounded toe and a pale sole line
     const heel = { x: A.x - (toe.x - A.x) * 0.25, y: A.y + R(0.012) };
-    limb(heel, { x: toe.x, y: toe.y + R(0.004) }, R(0.058), R(0.05), shoe, { hl: false });
+    const cuff = { x: A.x + (K.x - A.x) * 0.3, y: A.y + (K.y - A.y) * 0.3 };
+    chain([
+      [cuff, A, R(0.056), R(0.05), shoe, { hl: false }],
+      [heel, { x: toe.x, y: toe.y + R(0.004) }, R(0.058), R(0.048), shoe, { hl: false }],
+    ]);
+    if (!st.holo) line(g, st, [heel.x - R(0.03), heel.y + R(0.05), toe.x + R(0.03), toe.y + R(0.046)], 0.7, thief ? st.rim : 'rgba(210,214,226,0.75)');
   };
   const drawArm = (Arm, near) => {
     const Sh = pr(Arm.S);
     const E = pr(Arm.E);
     const W = pr(Arm.W);
     const Hd = pr(Arm.hand);
+    const tip = { x: Hd.x + (Hd.x - W.x) * 1.1, y: Hd.y + (Hd.y - W.y) * 1.1 };
     chain([
-      [E, W, R(0.058), R(0.046), top],
-      [Sh, E, R(0.076), R(0.06), top],
+      [E, W, R(0.06), R(0.044), top],
+      [Sh, E, R(0.084), R(0.06), top], // a real deltoid at the top
     ]);
-    inkFill(g, st, ell(g, Hd.x, Hd.y, R(0.054), R(0.056)), glove, { r: R(0.055), hl: false });
-    if (!thief && look.epaulettes) inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.06), R(0.085), R(0.03)), look.accent, { r: R(0.04), hl: false });
+    crease(E, Sh, R(0.06));
+    // a gloved hand with a cuff, not a ball
+    limb(Hd, tip, R(0.05), R(0.038), glove, { hl: false });
+    if (!st.holo) {
+      const ang = Math.atan2(W.y - E.y, W.x - E.x) + Math.PI / 2;
+      line(g, st, [W.x + Math.cos(ang) * R(0.044), W.y + Math.sin(ang) * R(0.044), W.x - Math.cos(ang) * R(0.044), W.y - Math.sin(ang) * R(0.044)], 0.75, thief ? st.rim : null);
+    }
+    if (!thief && look.epaulettes) inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.07), R(0.09), R(0.03)), look.accent, { r: R(0.04), hl: false });
+    if (!thief && look.beacon && near && !st.holo) {
+      // a little shoulder beacon with a soft glow
+      const gr = g.createRadialGradient(Sh.x, Sh.y - R(0.08), 0, Sh.x, Sh.y - R(0.08), R(0.12));
+      gr.addColorStop(0, css(look.accent, 0.55));
+      gr.addColorStop(1, css(look.accent, 0));
+      g.fillStyle = gr;
+      g.fillRect(Sh.x - R(0.14), Sh.y - R(0.22), R(0.28), R(0.28));
+      inkFill(g, st, ell(g, Sh.x, Sh.y - R(0.08), R(0.026), R(0.026)), lift(look.accent, 0.4), { r: R(0.03), hl: false, shadeK: 0.95 });
+    }
     if (near && !thief) drawProp(g, st, look, Hd, E, fx, S);
   };
 
@@ -546,8 +649,9 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
   const T = pr(sk.top);
   const Pp = pr(sk.P);
   const td = (0.175 + b.belly * 0.3) * bulk;
-  const w1 = (b.shoulders * 0.98 * Math.abs(Math.cos(phi + pose.torsoRY)) + td * Math.abs(fx)) * S + R(0.03);
-  const w2 = (0.19 * bulk * Math.abs(fz) + (td * 0.92 + b.belly * 0.35) * Math.abs(fx)) * S;
+  const taper = b.taper ?? 1;
+  const w1 = (b.shoulders * 1.02 * Math.abs(Math.cos(phi + pose.torsoRY)) + td * Math.abs(fx)) * S + R(0.03);
+  const w2 = (0.19 * bulk * taper * Math.abs(fz) + (td * 0.92 * Math.min(1, taper + 0.08) + b.belly * 0.35) * Math.abs(fx)) * S;
   const ax = T.x - Pp.x;
   const ay = T.y - Pp.y;
   const al = Math.hypot(ax, ay) || 1;
@@ -576,7 +680,8 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
 
   // coat tails hang from the waist, over the thighs
   if (!thief && look.coat > 0 && !pose.sleep) {
-    const len = look.coat * S * b.height;
+    // a coat bunches up when its wearer crouches
+    const len = look.coat * S * b.height * (pose.py < 0.7 ? 0.42 : 1);
     const hem = w2 * 1.18 + R(0.05);
     const sway = (pose.bob > 0 ? 1 : 0) * R(0.02);
     const coatPath = () => {
@@ -589,6 +694,7 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
       g.closePath();
     };
     inkFill(g, st, coatPath, top, { r: w2, fold: 0.22 });
+    if (!st.holo) for (const e of [-0.55, 0.5]) line(g, st, [Pp.x + e * w2, Pp.y + len * 0.25, Pp.x + e * hem * 0.95, Pp.y + len * 0.96], 0.5, 'rgba(11,13,18,0.42)');
     if (fz > 0.3) line(g, st, [Pp.x + fx * td * S * 0.8, Pp.y, Pp.x + fx * td * S * 0.8 + R(0.02), Pp.y + len], 0.9);
     else if (fz < -0.3) line(g, st, [Pp.x, Pp.y + len * 0.45, Pp.x, Pp.y + len], 0.9);
   }
@@ -608,23 +714,50 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
     const front = fz > 0.15;
     const back = fz < -0.15;
     if (thief) {
-      // quiet seams and a slim utility belt: nothing to identify
-      g.strokeStyle = st.rim;
-      g.globalAlpha = 0.5;
-      g.lineWidth = st.lw * 0.7;
-      const m0 = mid(0.2);
-      const m1 = mid(0.95);
+      // one diagonal utility strap, a centre seam and a collar: gear, not a costume
+      const dirS = back ? -1 : 1;
+      const s0 = { x: T.x - dirS * w1 * 0.72, y: T.y + R(0.02) };
+      const s1 = { x: Pp.x + dirS * w2 * 0.95, y: Pp.y - R(0.02) };
       g.beginPath();
-      g.moveTo(m0.x, m0.y);
-      g.lineTo(m1.x, m1.y);
+      g.moveTo(s0.x - R(0.028), s0.y);
+      g.lineTo(s0.x + R(0.028), s0.y);
+      g.lineTo(s1.x + R(0.028), s1.y);
+      g.lineTo(s1.x - R(0.028), s1.y);
+      g.closePath();
+      g.fillStyle = css(scale(look.suit, 1.9));
+      g.fill();
+      g.strokeStyle = st.rim;
+      g.globalAlpha = 0.7;
+      g.lineWidth = st.lw * 0.6;
+      g.stroke();
+      g.globalAlpha = 1;
+      if (front) {
+        const pm = { x: s0.x + (s1.x - s0.x) * 0.55, y: s0.y + (s1.y - s0.y) * 0.55 };
+        g.beginPath();
+        g.roundRect(pm.x - R(0.04), pm.y - R(0.035), R(0.08), R(0.075), R(0.012));
+        g.fillStyle = css(scale(look.suit, 2.3));
+        g.fill();
+        g.stroke();
+        const m0 = mid(0.1);
+        const m1 = mid(0.98);
+        g.globalAlpha = 0.45;
+        line(g, st, [m0.x, m0.y, m1.x, m1.y], 0.6, st.rim);
+        g.globalAlpha = 1;
+      }
+      const nk = mid(1.0);
+      g.globalAlpha = 0.7;
+      g.beginPath();
+      g.ellipse(nk.x - cl, nk.y - R(0.005), R(0.085) * k + R(0.02), R(0.032), 0, 0, Math.PI);
+      g.strokeStyle = st.rim;
+      g.lineWidth = st.lw * 0.7;
       g.stroke();
       g.globalAlpha = 1;
     } else if (front) {
       const neckP = mid(1.02);
       const chestP = mid(0.52);
-      if (look.tie) {
-        // shirt V, then the tie
-        g.fillStyle = '#f2ede2';
+      if (look.tie || look.lapels) {
+        // shirt V, then the tie; an enforcer wears a dark roll-neck instead
+        g.fillStyle = look.tie ? '#f6f1e6' : css(0x23262f);
         g.beginPath();
         g.moveTo(neckP.x - R(0.09) * k, neckP.y);
         g.lineTo(neckP.x + R(0.09) * k, neckP.y);
@@ -634,7 +767,7 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
         g.strokeStyle = st.ink;
         g.lineWidth = st.lw * 0.7;
         g.stroke();
-        g.fillStyle = css(look.accent);
+        g.fillStyle = look.tie ? css(look.accent) : 'rgba(0,0,0,0)';
         g.beginPath();
         g.moveTo(neckP.x - R(0.022) * k, neckP.y + R(0.02));
         g.lineTo(neckP.x + R(0.022) * k, neckP.y + R(0.02));
@@ -642,14 +775,18 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
         g.lineTo(chestP.x, chestP.y);
         g.lineTo(chestP.x - R(0.03) * k, chestP.y - R(0.06));
         g.closePath();
-        g.fill();
-        g.stroke();
-        // lapels
+        if (look.tie) {
+          g.fill();
+          g.stroke();
+        }
+        // lapels: sharp, with a notch
         g.fillStyle = css(scale(top, 0.72));
         for (const e of [1, -1]) {
           g.beginPath();
           g.moveTo(neckP.x + e * R(0.1) * k, neckP.y - R(0.01));
-          g.lineTo(neckP.x + e * R(0.19) * k, neckP.y + R(0.1));
+          g.lineTo(neckP.x + e * R(0.21) * k, neckP.y + R(0.07));
+          g.lineTo(neckP.x + e * R(0.15) * k, neckP.y + R(0.13));
+          g.lineTo(neckP.x + e * R(0.2) * k, neckP.y + R(0.17));
           g.lineTo(chestP.x + e * R(0.012), chestP.y + R(0.03));
           g.closePath();
           g.fill();
@@ -735,6 +872,14 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
         g.stroke();
       }
     }
+    // inked shadow hatching on the side away from the light
+    if (!thief) {
+      const heavy = look.archetype === 'enforcer';
+      const n = heavy ? 9 : 5;
+      const hx0 = Pp.x + N.x * w2 * (heavy ? 0.1 : 0.35);
+      const hy0 = Pp.y + (T.y - Pp.y) * (heavy ? 0.7 : 0.5);
+      for (let i = 0; i < n; i++) line(g, st, [hx0 + i * R(0.03), hy0, hx0 + i * R(0.03) - R(0.05), hy0 + R(0.13) + i * R(0.008)], 0.5, heavy ? 'rgba(11,13,18,0.5)' : 'rgba(11,13,18,0.3)');
+    }
     // belt: all the way round
     const bl = mid(0.06);
     g.fillStyle = thief ? css(scale(look.suit, 1.6)) : css(0x15161c);
@@ -746,6 +891,16 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
       g.fillStyle = thief ? st.rim : '#c9a24a';
       g.fillRect(bl.x - R(0.022), bl.y - R(0.018), R(0.044), R(0.036));
     }
+    // utility pouches
+    if (thief || look.archetype === 'watchman' || look.archetype === 'tactical') {
+      g.fillStyle = thief ? css(scale(look.suit, 2.1)) : css(0x23262f);
+      for (const e of thief ? [1] : [1, -1]) {
+        g.beginPath();
+        g.roundRect(Pp.x + e * w2 * 0.62 - R(0.035), bl.y - R(0.012), R(0.07), R(0.075), R(0.012));
+        g.fill();
+        g.stroke();
+      }
+    }
     g.restore();
   }
 
@@ -755,6 +910,33 @@ function drawFigure(g, st, look, pose, phi, cx, gy) {
   const r = 0.172 * S * b.head;
   if (!thief && look.scarf) inkFill(g, st, ell(g, Nk.x, Nk.y + R(0.02), R(0.13), R(0.07)), look.accent, { r: R(0.08) });
   else limb({ x: Nk.x, y: Nk.y + R(0.03) }, { x: (Nk.x + Hd.x) / 2, y: (Nk.y + Hd.y) / 2 }, R(0.064), R(0.058), thief ? look.suit : skin, { hl: false });
+
+  if (!thief && look.collar && !st.holo) {
+    // a high popped greatcoat collar framing the jaw
+    for (const e of [1, -1]) {
+      const wing = () => {
+        g.beginPath();
+        g.moveTo(Nk.x + e * R(0.035), Nk.y + R(0.07));
+        g.lineTo(Nk.x + e * R(0.16) + fx * R(0.03), Nk.y - R(0.13));
+        g.lineTo(Nk.x + e * R(0.21), Nk.y + R(0.075));
+        g.closePath();
+      };
+      inkFill(g, st, wing, scale(top, 0.82), { r: R(0.1), fold: 0.2 });
+    }
+  }
+  if (!thief && look.beacon && !st.holo && fz > -0.4) {
+    // collar tubing from the helmet down to the chest unit
+    g.beginPath();
+    g.moveTo(Hd.x - fx * r * 0.2 + r * 0.55, Hd.y + r * 0.75);
+    g.bezierCurveTo(Hd.x + r * 1.0, Hd.y + r * 1.5, T.x + w1 * 0.75, T.y + R(0.02), T.x + w1 * 0.35, T.y + R(0.2));
+    g.strokeStyle = st.ink;
+    g.lineWidth = st.lw * 2.6;
+    g.lineCap = 'round';
+    g.stroke();
+    g.strokeStyle = css(lift(look.accent, 0.2));
+    g.lineWidth = st.lw * 1.0;
+    g.stroke();
+  }
 
   if (!side) drawArm(arms[0].A, false);
   drawArm(arms[1].A, true);
@@ -795,6 +977,31 @@ function drawProp(g, st, look, hand, elbow, fx, S) {
     inkFill(g, st, body, 0xb8c0c8, { r: 5 * u });
     g.fillStyle = css(look.accent);
     g.fillRect(hand.x - 4 * u, hand.y - 16 * u, 8 * u, 4 * u);
+  } else if (p === 'mug') {
+    const body = () => {
+      g.beginPath();
+      g.roundRect(hand.x - 5 * u, hand.y - 12 * u, 10 * u, 12 * u, 1.5 * u);
+    };
+    g.beginPath();
+    g.arc(hand.x + 6 * u * dir, hand.y - 6 * u, 3.4 * u, 0, Math.PI * 2);
+    g.strokeStyle = st.ink;
+    g.lineWidth = st.lw * 1.3;
+    g.stroke();
+    inkFill(g, st, body, 0xf2ede2, { r: 6 * u });
+    g.fillStyle = css(look.accent);
+    g.fillRect(hand.x - 5 * u, hand.y - 6 * u, 10 * u, 2.5 * u);
+    if (!st.holo) {
+      // steam
+      g.strokeStyle = 'rgba(255,255,255,0.75)';
+      g.lineWidth = st.lw * 0.8;
+      g.lineCap = 'round';
+      for (const o of [-2.5, 2]) {
+        g.beginPath();
+        g.moveTo(hand.x + o * u, hand.y - 14 * u);
+        g.bezierCurveTo(hand.x + (o + 4) * u, hand.y - 19 * u, hand.x + (o - 4) * u, hand.y - 23 * u, hand.x + (o + 1) * u, hand.y - 29 * u);
+        g.stroke();
+      }
+    }
   } else if (p === 'keys') {
     g.beginPath();
     g.arc(hand.x, hand.y + 7 * u, 3.5 * u, 0, Math.PI * 2);
@@ -837,6 +1044,16 @@ function drawProp(g, st, look, hand, elbow, fx, S) {
 
 // ------------------------------------------------------------------ halftone
 
+const scratches = new Map();
+function scratch(size) {
+  if (!scratches.has(size)) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    scratches.set(size, c);
+  }
+  return scratches.get(size);
+}
+
 const screens = new Map();
 /** Ben-Day dots, dense towards the lower right, used to shade the whole figure. */
 function halftone(size) {
@@ -870,14 +1087,14 @@ export function drawCharacterFrame(g, size, look, key, view) {
   const st = makeStyle(look, size);
   if (st.thief) st.rim = css(look.highlight);
   g.clearRect(0, 0, size, size);
-  const pose = jointPose(key.mode, key.crouch, key.walk, key.alt);
+  const pose = jointPose(key.mode, key.crouch, key.walk, key.alt, st.thief ? 'thief' : 'guard');
   const cx = size / 2;
   const gy = size * GROUND_LINE;
   const S = st.S;
   if (pose.sleep) {
     // slumped flat on their back, head to the left
     g.save();
-    g.translate(cx + 0.95 * look.build.height * S, gy - 0.2 * S);
+    g.translate(cx + 0.88 * look.build.height * S, gy - 0.34 * S);
     g.rotate(-Math.PI / 2);
     drawFigure(g, st, look, pose, 0.0001, 0, 0);
     g.restore();
@@ -885,10 +1102,29 @@ export function drawCharacterFrame(g, size, look, key, view) {
     drawFigure(g, st, look, pose, (view * Math.PI) / 4 + 0.0001, cx, gy);
   }
   if (!st.holo) {
+    // Ben-Day shading across the whole figure
     g.save();
     g.globalCompositeOperation = 'source-atop';
-    g.globalAlpha = st.thief ? 0.5 : 0.2;
+    g.globalAlpha = st.thief ? 0.45 : 0.2;
     g.drawImage(halftone(size), 0, 0);
+    g.restore();
+    // Rim light: everything that is figure here but not figure a few pixels
+    // down-right is the lit upper-left silhouette edge. Paint that sliver.
+    const tmp = scratch(size);
+    const tg = tmp.getContext('2d');
+    const off = size * 0.0066;
+    tg.globalCompositeOperation = 'source-over';
+    tg.clearRect(0, 0, size, size);
+    tg.drawImage(g.canvas, 0, 0);
+    tg.globalCompositeOperation = 'destination-out';
+    tg.drawImage(g.canvas, off, off * 1.15);
+    tg.globalCompositeOperation = 'source-in';
+    tg.fillStyle = st.thief ? '#cfe6ff' : '#ffffff';
+    tg.fillRect(0, 0, size, size);
+    g.save();
+    g.globalCompositeOperation = 'source-atop';
+    g.globalAlpha = st.thief ? 0.95 : 0.6;
+    g.drawImage(tmp, 0, 0);
     g.restore();
   } else {
     // hologram scanlines
