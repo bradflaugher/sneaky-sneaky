@@ -8,11 +8,11 @@
 import * as THREE from 'three';
 
 let gradient = null;
-/** 4 hard bands: ink shadow, half-tone, light, hot highlight. */
+/** 5 bands: deep shadow, shadow, half-tone, light, highlight. Stepped, but not harsh. */
 export function toonGradient() {
   if (gradient) return gradient;
-  const data = new Uint8Array([70, 70, 70, 255, 135, 135, 135, 255, 200, 200, 200, 255, 255, 255, 255, 255]);
-  gradient = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
+  const data = new Uint8Array([64, 64, 64, 255, 104, 104, 104, 255, 150, 150, 150, 255, 205, 205, 205, 255, 255, 255, 255, 255]);
+  gradient = new THREE.DataTexture(data, 5, 1, THREE.RGBAFormat);
   gradient.minFilter = gradient.magFilter = THREE.NearestFilter;
   gradient.generateMipmaps = false;
   gradient.needsUpdate = true;
@@ -49,7 +49,7 @@ export function rimify(mat, color = 0xffffff, strength = 0.55) {
       .replace(
         '#include <opaque_fragment>',
         `float rimF = 1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0);
-         outgoingLight += uRim * step(0.62, rimF);
+         outgoingLight += uRim * smoothstep(0.58, 0.74, rimF);
          #include <opaque_fragment>`,
       );
   };
@@ -57,7 +57,7 @@ export function rimify(mat, color = 0xffffff, strength = 0.55) {
   return mat;
 }
 
-const INK = new THREE.MeshBasicMaterial({ color: 0x030303, side: THREE.BackSide });
+const INK = new THREE.MeshBasicMaterial({ color: 0x04100c, side: THREE.BackSide });
 const INK_LINE = new THREE.LineBasicMaterial({ color: 0x030303 });
 const _box = new THREE.Box3();
 const _size = new THREE.Vector3();

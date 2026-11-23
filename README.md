@@ -39,29 +39,51 @@ Every room rolls its own heist target and its own address from the seed.
 Difficulty never changes the prize: target and venue depend only on the seed
 and theme.
 
+## Your agent
+
+There is no default hero. A new player is dealt a random original agent
+(outfit, two-tone palette, headgear, hair, skin tone, build, codename), and the
+first **START HEIST** opens **Select Your Agent**: keep them, hit **REROLL
+AGENT**, or tailor every detail, then **CONFIRM & DEPLOY**. After that, runs
+start immediately; the agent screen stays available from the title and pause
+menus.
+
+- 8 outfits: Long Coat, Cropped Moto Jacket, Hooded Parka, Tailored Heist
+  Suit, Tech Vest, Jumpsuit, Stealth Poncho, Tactical Rig.
+- 12 head options: Hood, Bucket Hat, Beanie, Round Shades, Visor Cap,
+  Headphones, Flat Cap, Cropped Hair, Spiky Hair, Ponytail, Goggles, Bandana.
+- 16 cohesive palettes, 8 hair colours, 6 skin tones, 5 builds.
+- Guards are generated the same way per room: each theme has its own pool of
+  outfits, palettes, headgear, builds, scarves, shades and facial hair.
+
+The generator lives in `src/core/agent.js` and is unit tested.
+
 ## Art direction
 
-PS1 *Metal Gear Solid* (1998) by way of 90s black-ink comics and Persona-style
-graphic UI. Dark, nocturnal, high contrast.
+Green noir. Shadows fall to deep emerald and jade; each setting adds exactly
+one counter-colour for its light. The aim is a calm, composed frame where the
+eye goes straight to the agent, the guards, their cones and the loot.
 
-- **Characters** are angular flat-shaded low-poly built from tapered boxes:
-  broad shoulders, V-chest, chest rigs and pouches, heavy brow and eyes lost
-  in shadow, a bandana with trailing tails. No spheres, no capsules. Guards
-  get helmets, balaclavas, gas masks, visors, fedoras and trenchcoat tails.
-- **Ink**: inverted-hull black outlines on characters and loot, crease lines
-  (`EdgesGeometry`) on walls and props, stepped fresnel rim highlights.
-- **Cel shading**: `MeshToonMaterial` with a hard 4-band gradient and flat
-  facets everywhere (`src/render/toon.js`).
-- **Pixel textures**: 64–128 px procedural canvases sampled with
-  `NearestFilter`: grime, stains, cracks, drips, crosshatch grain.
-- **Comic pass** (`src/render/comicPass.js`): chunky pixel grid, luma-edge ink
-  contours, crushed-black noir grade with per-theme tints, 4×4 Bayer dithering
-  with colour quantisation in the shadows, film grain, vignette.
-- **Visual Style** (pause menu): `PS1 Comic` (default) or `Crisp Ink`, which
-  keeps the ink and grade but drops the pixelation and most of the dither.
-- **Six night settings**: storm-lashed yacht under sodium lamps, 2AM noir
-  skyscraper, grimy acid-green bio-bunker, floodlit canyon stronghold, noir
-  museum vault in gold and crimson, and a black-and-phosphor VR Missions grid.
+- **Quiet surfaces**: floors and walls are broad architectural panels with
+  hairline seams and gentle tonal drift (`src/render/textures.js`). The floor
+  has a soft sheen so lamp pools bloom across it.
+- **Characters** are angular flat-shaded low-poly built from tapered boxes,
+  with a thin ink hull and a soft rim light. Ink outlines are reserved for
+  characters and the loot; walls and props carry no edge lines.
+- **Light**: one sculptural key with shadows, a warm or luminous practical per
+  chamber with a floor pool and a slowly drifting volumetric shaft, light fog.
+- **Finishing pass** (`src/render/comicPass.js`): crisp sampling, hairline ink
+  on decisive edges only, emerald shadow tint with a warm highlight lift, a
+  whisper of Bayer dither in deep shadow, fine grain, soft vignette, gentle
+  bloom. **Visual Style** in the pause menu: `Noir Hybrid` (default) or
+  `Clean Crisp`.
+- **Six two-tone settings**: ocean teal + amber deck lamps (yacht),
+  emerald-slate + cyan CRT (office), jade-obsidian + mint (lab), verdigris +
+  terracotta tungsten (bunker), obsidian-emerald + gallery gold with a little
+  crimson (museum), abyssal black + phosphor mint (VR).
+- **HUD** is corner-only and hairline: objective top-left, radar top-right.
+  The room briefing is a lower-third strip that fades in about 1.8 s, and the
+  key legend fades after a few seconds, so nothing sits over the play field.
 
 ## Play
 
@@ -181,6 +203,7 @@ src/main.js           entry point
 src/style.css         all UI styling (100dvh, safe-area insets, portrait/landscape)
 src/core/             pure logic, no three.js, unit tested
   rng.js              seeded PRNG
+  agent.js            random original agents, options, save migration
   grid.js             cells, DDA raycast, line of sight, pathfinding
   patrol.js           patrol timelines (pose as a function of time)
   stealth.js          vision, detection rate, choke-out arc, ranking
