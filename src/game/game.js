@@ -17,14 +17,14 @@ import { resolveMods, tierFor, describeRun, describeSetup, setupFromParams, setu
 import { buildWorld } from '../render/world.js';
 import { buildCharacter, animateCharacter, settleCharacter, addSilhouette, guardSpec, agentSpec, yawOf } from '../render/character.js';
 import { createCone } from '../render/cones.js';
-import { toon, inkEdges } from '../render/toon.js';
+import { glowTexture } from '../render/textures.js';
 import { createFx } from '../render/fx.js';
 import { createComicPass, VISUAL_STYLES } from '../render/comicPass.js';
 
 import { CameraRig } from './camera.js';
 import { Input } from './input.js';
 import { GameAudio } from './audio.js';
-import { loadSave, storeSave, recordLoot } from './save.js';
+import { loadSave, storeSave, recordLoot, confirmAgent } from './save.js';
 import { UI } from '../ui/ui.js';
 import { Radar } from '../ui/radar.js';
 import { Customizer } from '../ui/customizer.js';
@@ -136,12 +136,12 @@ export class Game {
     }
     this.composer.addPass(new OutputPass());
     this.comic = createComicPass();
-    if (!VISUAL_STYLES[this.save.settings.style]) this.save.settings.style = 'ps1';
+    if (!VISUAL_STYLES[this.save.settings.style]) this.save.settings.style = 'noir';
     this.comic.setStyle(this.save.settings.style);
     this.composer.addPass(this.comic.pass);
     this.ui.setStyle(VISUAL_STYLES[this.save.settings.style].name);
     // A cold key that follows the agent, so they always read against the dark.
-    this.agentLight = new THREE.PointLight(0xbfe8ff, 9, 5.5, 1.6);
+    this.agentLight = new THREE.PointLight(0xd8fff0, 4.5, 5.5, 1.6);
     this.scene.add(this.agentLight);
     this.buildPreview();
 
@@ -164,7 +164,7 @@ export class Game {
 
     this._last = performance.now();
     const frame = (now) => {
-      const dt = Math.min(0.05, (now - this._last) / 1000);
+      const dt = Math.max(0, Math.min(0.05, (now - this._last) / 1000)); // the first frame can report a timestamp from before startup finished
       this._last = now;
       this.frame(dt);
       requestAnimationFrame(frame);
@@ -191,38 +191,37 @@ export class Game {
   }
 
   buildPreview() {
-    // A noir turntable: one hard key, a crimson kicker, a blood-red backdrop slab.
+    // The Agent Select stage: a dark plinth, one warm key from the front, hard
+    // emerald rim light from behind, and a slow shaft of light falling through.
     const s = new THREE.Scene();
-    s.background = new THREE.Color(0x050506);
-    s.fog = new THREE.Fog(0x050506, 9, 20);
-    s.add(new THREE.HemisphereLight(0x8090c0, 0x100808, 0.55));
-    const key = new THREE.DirectionalLight(0xfff0dc, 2.6);
-    key.position.set(2.5, 4, 3.5);
+    s.background = new THREE.Color(0x030b09);
+    s.fog = new THREE.Fog(0x030b09, 8, 19);
+    s.add(new THREE.HemisphereLight(0x6ab8a0, 0x0a1410, 0.55));
+    const key = new THREE.DirectionalLight(0xffe6c4, 2.4);
+    key.position.set(2.2, 3.6, 4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
+    key.shadow.radius = 4;
     Object.assign(key.shadow.camera, { left: -2.5, right: 2.5, top: 3, bottom: -1, near: 1, far: 12 });
-    const rim = new THREE.DirectionalLight(0xc1121f, 2.4);
-    rim.position.set(-3, 2.5, -3.5);
-    s.add(key, rim);
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.35, 0.12, 8), toon(0x16161a));
-    disc.position.y = -0.06;
+    const rimA = new THREE.DirectionalLight(0x5cf0b0, 2.6);
+    rimA.position.set(-3, 2.6, -3.5);
+    const rimB = new THREE.DirectionalLight(0x3ad8c8, 1.6);
+    rimB.position.set(3.2, 1.6, -3);
+    s.add(key, rimA, rimB);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.3, 0.1, 48), new THREE.MeshStandardMaterial({ color: 0x0c1a16, roughness: 0.3, metalness: 0.4 }));
+    disc.position.y = -0.05;
     disc.receiveShadow = true;
-    inkEdges(disc);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.025, 4, 8), new THREE.MeshBasicMaterial({ color: 0xc1121f }));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.26, 0.008, 6, 96), new THREE.MeshBasicMaterial({ color: 0x5cf0b0 }));
     ring.rotation.x = Math.PI / 2;
-    ring.rotation.z = Math.PI / 8;
-    ring.position.y = 0.01;
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(16, 24), toon(0x0c0c0e));
+    ring.position.y = 0.005;
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(16, 48), new THREE.MeshStandardMaterial({ color: 0x06100d, roughness: 0.55, metalness: 0.2 }));
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.12;
+    floor.position.y = -0.1;
     floor.receiveShadow = true;
-    const slab = new THREE.Mesh(new THREE.PlaneGeometry(5, 9), new THREE.MeshBasicMaterial({ color: 0x8a0d18, fog: false }));
-    slab.position.set(0.4, 2.2, -4.5);
-    slab.rotation.z = -0.22;
-    const slab2 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 9), new THREE.MeshBasicMaterial({ color: 0xefe6d2, fog: false }));
-    slab2.position.set(-2.6, 2.2, -4.4);
-    slab2.rotation.z = -0.22;
-    s.add(disc, ring, floor, slab, slab2);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(2.4, 40), new THREE.MeshBasicMaterial({ color: 0x5cf0b0, map: glowTexture(), transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false }));
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.y = 0.012;
+    s.add(disc, ring, floor, pool);
     this.previewScene = s;
     this.previewCam = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
     this.previewSpin = 0.5;
@@ -401,6 +400,11 @@ export class Game {
 
   startRun() {
     this.audio.unlock();
+    // First heist: meet (or reroll) your randomly generated agent before deploying.
+    if (!this.save.agentConfirmed) {
+      this.openCustomizer(true);
+      return;
+    }
     this.audio.uiBig();
     this.run.roomNo = 1;
     this.run.streak = 0;
@@ -415,6 +419,8 @@ export class Game {
     // Big compounds take a moment to generate and verify: say so first.
     await this.ui.loading(this.runLabel());
     this.loadRoom(this.run.roomNo, false);
+    this.camRig.setMode(this.save.settings.cam === 'tactical' ? 'tactical' : 'chase', true);
+    this.camRig.snap(this.player.x, this.player.z);
     this.ui.loaded();
     this.loadingRoom = false;
     this.state = 'playing';
@@ -424,7 +430,10 @@ export class Game {
     const room = this.room;
     const loot = room.loot.info;
     const tip = TIPS[this.run.roomNo - 1];
-    this.ui.banner(this.runLabel(), loot.name, (this.run.roomNo <= TIPS.length && this.setup.start === 'compact' ? tip : null) || `${room.venue} · ${loot.tagline}`, tip ? 5 : 3.6);
+    // A quick lower-third strip that gets out of the way: tips linger a touch longer.
+    const tipNow = this.run.roomNo <= TIPS.length && this.setup.start === 'compact' ? tip : null;
+    this.ui.banner(this.runLabel(), loot.name, tipNow || room.venue, tipNow ? 3.4 : 1.8);
+    this.ui.hintKeys();
   }
 
   nextRoom() {
@@ -457,10 +466,10 @@ export class Game {
     this.ui.show(null);
   }
 
-  openCustomizer() {
-    this.returnTo = this.state === 'paused' ? 'paused' : 'title';
+  openCustomizer(firstRun = false) {
+    this.returnTo = firstRun ? 'deploy' : this.state === 'paused' ? 'paused' : 'title';
     this.state = 'custom';
-    this.customizer.open(this.save.agent);
+    this.customizer.open(this.save.agent, firstRun || !this.save.agentConfirmed);
     this.ui.setHud(false);
     this.ui.show('custom');
   }
@@ -474,6 +483,16 @@ export class Game {
   back() {
     if (this.state !== 'custom' && this.state !== 'vault' && this.state !== 'setup') return;
     const themeChanged = this.state === 'setup' && this.themeBefore !== this.setup.theme;
+    if (this.state === 'custom') {
+      // pressing Confirm on the agent screen locks the agent in
+      confirmAgent(this.save);
+      storeSave(this.save);
+      if (this.returnTo === 'deploy') {
+        this.state = 'title';
+        this.startRun();
+        return;
+      }
+    }
     if (this.returnTo === 'paused') {
       this.state = 'paused';
       this.ui.setHud(true);
@@ -503,7 +522,7 @@ export class Game {
 
   toggleStyle() {
     const s = this.save.settings;
-    s.style = s.style === 'ps1' ? 'crisp' : 'ps1';
+    s.style = s.style === 'noir' ? 'clean' : 'noir';
     storeSave(this.save);
     this.comic.setStyle(s.style);
     this.ui.setStyle(VISUAL_STYLES[s.style].name);
@@ -591,7 +610,11 @@ export class Game {
       case 'custom':
       case 'setup':
       case 'vault':
-        if (input.take('pause')) this.back();
+        if (input.take('pause')) {
+          // Esc on the first-run agent screen backs out without deploying
+          if (this.state === 'custom' && this.returnTo === 'deploy') this.enterTitle(true);
+          else this.back();
+        }
         break;
     }
 
@@ -627,10 +650,12 @@ export class Game {
     if (this.state === 'custom') {
       this.previewSpin += dt * 0.5 + o.dx * 1.4;
       this.previewRig.root.rotation.y = this.previewSpin;
-      animateCharacter(this.previewRig, { mode: 'normal', speed: 0, crouch: Math.sin(t * 0.6) > 0.82, t }, dt);
+      animateCharacter(this.previewRig, { mode: 'normal', speed: 0, crouch: false, t }, dt);
     } else if (this.state === 'title' || this.state === 'vault' || (this.state === 'setup' && this.attract)) {
-      this.camRig.yaw += dt * 0.07;
-      this.camRig.update(dt, this.room.w / 2, this.room.h / 2, { stiffness: 2, distScale: Math.max(this.room.w, this.room.h * 1.5) / 15 });
+      // slow orbit over a live diorama, framed off-centre so the menu has air
+      this.camRig.yaw += dt * 0.05;
+      this.camRig.pitch = 0.74;
+      this.camRig.update(dt, this.room.w / 2 - 3, this.room.h / 2, { stiffness: 2, distScale: Math.max(this.room.w, this.room.h * 1.5) / 19 });
     } else if (this.state === 'failed' && this.failGuard) {
       const g = this.failGuard;
       this.camRig.update(dt, (g.pose.x + this.player.x) / 2, (g.pose.z + this.player.z) / 2, { stiffness: 12, distScale: 0.62 });
@@ -902,7 +927,7 @@ export class Game {
       this.fx.stamp('YOINK!', '#ffd27a', this.room.loot.x, 2.1, this.room.loot.z, 0.6, 1.3, '#c1121f');
       this.fx.ring(this.room.exit.x, this.room.exit.z, 0x5aff9a, 3, 1.4);
       this.updateObjective();
-      this.ui.banner(`${this.room.loot.info.rarity} · ${this.room.loot.info.serial}`, this.room.loot.info.name, 'Extraction pad is live. Get out clean.', 2.6);
+      this.ui.banner(`${this.room.loot.info.rarity} · ${this.room.loot.info.serial}`, this.room.loot.info.name, 'Extraction pad is live. Get out clean.', 1.8);
     } else if (ctx.type === 'switch') {
       const i = ctx.sw.laser;
       this.lasers[i] = false;

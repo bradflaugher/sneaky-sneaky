@@ -124,13 +124,21 @@ export class UI {
     $('btn-knock').classList.toggle('cooling', !ready);
   }
 
-  banner(eyebrow, title, sub, seconds = 3.2) {
+  banner(eyebrow, title, sub, seconds = 1.8) {
     $('banner-eyebrow').textContent = eyebrow;
     $('banner-title').textContent = title;
     $('banner-sub').textContent = sub;
     $('banner').classList.add('on');
     clearTimeout(this._bannerT);
     this._bannerT = setTimeout(() => $('banner').classList.remove('on'), seconds * 1000);
+  }
+
+  /** Show the key legend, then let it fade so it never sits in a screenshot. */
+  hintKeys(seconds = 7) {
+    const k = $('keys-hint');
+    k.classList.remove('faded');
+    clearTimeout(this._keysT);
+    this._keysT = setTimeout(() => k.classList.add('faded'), seconds * 1000);
   }
 
   hideBanner() {

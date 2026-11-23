@@ -148,7 +148,8 @@
 
     <section id="screen-custom" class="screen hidden">
       <div class="custom-panel glass">
-        <div class="eyebrow">AGENT DOSSIER</div>
+        <div class="eyebrow" id="custom-title">AGENT DOSSIER</div>
+        <p id="custom-intro" class="blurb"></p>
         <div class="field name-field">
           <label for="codename">CODENAME</label>
           <div class="name-row">
@@ -156,11 +157,9 @@
             <button id="btn-dice" class="icon-btn" aria-label="Random codename">🎲</button>
           </div>
         </div>
+        <button id="btn-random-look" class="btn">REROLL AGENT</button>
         <div id="custom-fields"></div>
-        <div class="row">
-          <button id="btn-random-look" class="btn">SURPRISE ME</button>
-          <button id="btn-custom-done" class="btn primary">DONE</button>
-        </div>
+        <button id="btn-custom-done" class="btn primary">CONFIRM</button>
       </div>
     </section>
 

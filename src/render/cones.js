@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { castRay } from '../core/grid.js';
 
 const RAYS = 40;
-const CALM = new THREE.Color(0x19f0e0);
+const CALM = new THREE.Color(0x5cf0b0);
 const WARY = new THREE.Color(0xffb000);
 const HOT = new THREE.Color(0xff1f2f);
 
@@ -21,8 +21,8 @@ void main() {
   vWorld = position;
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }`;
-// Graphic, not glowy: the crouch-visible zone is a flat fill with hard marching
-// bands; the standing-only zone is inked crosshatching.
+// Calm and legible: the crouch-visible zone is a soft translucent wash that
+// thins with distance; the standing-only zone is a fine, quiet hatch.
 const FRAG = `
 uniform vec3 uColor;
 uniform float uOpacity;
@@ -31,12 +31,12 @@ uniform float uStripe;
 varying float vDist;
 varying vec3 vWorld;
 void main() {
-  float band = 0.5 + 0.5 * step(0.5, fract(vDist * 5.0 - uTime * 0.7));
-  float fade = 1.0 - 0.45 * step(0.5, vDist) - 0.2 * step(0.8, vDist);
-  float hatch = max(step(0.7, fract((vWorld.x + vWorld.z) * 2.6)), step(0.7, fract((vWorld.x - vWorld.z) * 2.6)));
-  float fill = mix(band * fade, hatch * 0.9, uStripe);
-  float rim = step(0.95, vDist);
-  gl_FragColor = vec4(uColor * (1.0 + rim * 0.6), min(1.0, uOpacity * fill + rim * 0.75));
+  float wash = 1.0 - 0.55 * vDist;
+  float pulse = 0.94 + 0.06 * sin(vDist * 14.0 - uTime * 2.2);
+  float hatch = step(0.78, fract((vWorld.x + vWorld.z) * 3.2));
+  float fill = mix(wash * pulse, hatch * (1.0 - 0.4 * vDist), uStripe);
+  float rim = smoothstep(0.965, 1.0, vDist) * 0.5;
+  gl_FragColor = vec4(uColor * 1.1, min(1.0, uOpacity * fill + rim));
 }`;
 
 function makeLayer(opacity, stripe, y) {
@@ -63,13 +63,13 @@ function makeLayer(opacity, stripe, y) {
 }
 
 export function createCone(parent) {
-  const low = makeLayer(0.42, 0, 0.05);
-  const high = makeLayer(0.5, 1, 0.045);
+  const low = makeLayer(0.2, 0, 0.05);
+  const high = makeLayer(0.15, 1, 0.045);
   // hard inked outline around the whole cone
   const outlinePos = new Float32Array((RAYS + 3) * 3);
   const outlineGeo = new THREE.BufferGeometry();
   outlineGeo.setAttribute('position', new THREE.BufferAttribute(outlinePos, 3));
-  const outlineMat = new THREE.LineBasicMaterial({ color: 0x19f0e0, transparent: true, opacity: 0.95, depthWrite: false });
+  const outlineMat = new THREE.LineBasicMaterial({ color: 0x5cf0b0, transparent: true, opacity: 0.6, depthWrite: false });
   const outline = new THREE.Line(outlineGeo, outlineMat);
   outline.frustumCulled = false;
   outline.renderOrder = 6;

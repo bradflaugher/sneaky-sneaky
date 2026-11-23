@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { miscTexture } from './textures.js';
 import { toon, rimify, inkAll } from './toon.js';
+import { SKIN_TONES, HAIR_COLORS, BUILDS, OUTFITS, HEADGEAR } from '../core/agent.js';
 
 const HIP_Y = 0.92;
 const THIGH = 0.43;
@@ -36,41 +37,8 @@ const taper = (wt, wb, h, dt, db, lean = 0) =>
   });
 /** Low-sided prism / frustum. */
 const prism = (rt, rb, h, n = 6) => geo(`pri:${rt}:${rb}:${h}:${n}`, () => new THREE.CylinderGeometry(rt, rb, h, n));
-const shard = (r) => geo(`ico:${r}`, () => new THREE.IcosahedronGeometry(r, 0));
 
-export const SKIN_TONES = [0xe9c4a0, 0xd3a077, 0xb98358, 0x93633e, 0x6b4429, 0x452b1b];
-export const BUILDS = {
-  slim: { name: 'Slim', w: 0.9, h: 1.0 },
-  standard: { name: 'Standard', w: 1.0, h: 1.0 },
-  stocky: { name: 'Stocky', w: 1.18, h: 0.95 },
-  tall: { name: 'Tall', w: 0.97, h: 1.09 },
-  compact: { name: 'Compact', w: 1.0, h: 0.88 },
-};
-export const OUTFITS = {
-  sneak: 'Sneaking Suit',
-  burglar: 'Velvet Burglar',
-  tourist: 'Resort Tourist',
-  labcoat: 'Lab Coat',
-  recon: 'Desert Recon',
-  trench: 'Trenchcoat',
-};
-export const HEADGEAR = {
-  bandana: 'Tactical Bandana',
-  nvg: 'NVG Goggles',
-  beanie: 'Knit Beanie',
-  hair: 'Sleek Hair',
-  shades: 'Shades',
-  beret: 'Beret',
-};
-export const DEFAULT_AGENT = {
-  codename: 'Quiet Otter',
-  outfit: 'sneak',
-  primary: 0x3d5266,
-  accent: 0xc1121f,
-  head: 'bandana',
-  skin: 1,
-  build: 'standard',
-};
+export { SKIN_TONES, HAIR_COLORS, BUILDS, OUTFITS, HEADGEAR };
 
 const mul = (hex, k) => new THREE.Color(hex).multiplyScalar(k).getHex();
 
@@ -139,25 +107,23 @@ export function buildCharacter(spec) {
   let shinM = legM;
   let handM = gear;
   let shoeM = ink;
-  if (o === 'burglar') {
-    torsoM = armM = foreM = M(P, { tex: 'stripes' });
-    legM = shinM = M(0x121016);
-  } else if (o === 'tourist') {
-    torsoM = armM = M(P, { tex: 'hawaiian' });
-    foreM = skin;
+  const dark = M(0x15161b);
+  if (o === 'longcoat' || o === 'moto') {
+    legM = shinM = dark;
+  } else if (o === 'parka') {
+    legM = shinM = M(mul(P, 0.45));
+  } else if (o === 'suit') {
+    legM = shinM = torsoM;
     handM = skin;
-    legM = M(A);
-    shinM = skin;
-    shoeM = M(0x4a2e18);
-  } else if (o === 'labcoat') {
-    legM = shinM = M(mul(A, 0.6));
-    handM = M(0x3a6a78);
-  } else if (o === 'recon') {
-    torsoM = armM = foreM = M(P, { tex: 'camo' });
-    legM = shinM = M(mul(P, 0.85), { tex: 'camo' });
-    shoeM = M(0x2a2118);
-  } else if (o === 'trench') {
-    legM = shinM = M(0x15151a);
+  } else if (o === 'techvest') {
+    torsoM = armM = foreM = M(mul(P, 0.5));
+    legM = shinM = dark;
+  } else if (o === 'jumpsuit') {
+    legM = shinM = torsoM;
+    foreM = skin; // sleeves rolled
+  } else if (o === 'poncho') {
+    torsoM = armM = foreM = dark;
+    legM = shinM = M(0x1c1d22);
   } else if (o === 'polo') {
     foreM = skin;
     handM = skin;
@@ -231,16 +197,29 @@ export function buildCharacter(spec) {
   }
 
   const tails = [];
-  const hair = (long) => {
-    add(head, taper(0.225, 0.275, 0.075, 0.26, 0.305), hairM, 0, 0.15, -0.012);
+  // style: 'cropped' | 'fringe' | 'long' | 'spiky'
+  const hair = (style) => {
+    add(head, taper(0.225, 0.275, style === 'cropped' ? 0.05 : 0.075, 0.26, 0.305), hairM, 0, style === 'cropped' ? 0.137 : 0.15, -0.012);
     add(head, taper(0.28, 0.25, 0.15, 0.13, 0.1), hairM, 0, 0.05, -0.105);
-    if (long) add(head, taper(0.25, 0.16, 0.16, 0.09, 0.04, -0.02), hairM, 0, -0.09, -0.135); // the mullet
-    for (const [x, rz] of [
-      [-0.07, 0.35],
-      [0.0, -0.1],
-      [0.075, -0.4],
-    ])
-      add(head, taper(0.07, 0.015, 0.075, 0.05, 0.02), hairM, x, 0.085, 0.135, 0.25, 0, rz);
+    if (style === 'long') add(head, taper(0.25, 0.16, 0.16, 0.09, 0.04, -0.02), hairM, 0, -0.09, -0.135);
+    if (style === 'spiky') {
+      for (const [x, z, rx, rz, h] of [
+        [-0.08, 0.06, 0.3, 0.45, 0.13],
+        [0.0, 0.08, 0.45, 0.0, 0.16],
+        [0.08, 0.05, 0.3, -0.45, 0.13],
+        [-0.05, -0.05, -0.2, 0.3, 0.15],
+        [0.06, -0.06, -0.25, -0.3, 0.14],
+        [0.0, -0.13, -0.6, 0.0, 0.12],
+      ])
+        add(head, taper(0.012, 0.085, h, 0.012, 0.085), hairM, x, 0.19 + h * 0.3, z, rx, 0, rz);
+    } else if (style !== 'cropped') {
+      for (const [x, rz] of [
+        [-0.07, 0.35],
+        [0.0, -0.1],
+        [0.075, -0.4],
+      ])
+        add(head, taper(0.07, 0.015, 0.075, 0.05, 0.02), hairM, x, 0.085, 0.135, 0.25, 0, rz);
+    }
   };
   const shades = () => {
     add(head, taper(0.285, 0.265, 0.05, 0.05, 0.04), M(0x050507), 0, -0.03, 0.14);
@@ -249,7 +228,7 @@ export function buildCharacter(spec) {
   };
   switch (spec.head) {
     case 'bandana': {
-      hair(true);
+      hair('long');
       add(head, taper(0.262, 0.285, 0.055, 0.29, 0.31), accentM, 0, 0.062, -0.003); // band gripping the brow
       add(head, box(0.06, 0.05, 0.045), accentM, 0.03, 0.06, -0.165, 0, 0, 0.4); // knot
       for (const s of [1, -1]) {
@@ -263,7 +242,7 @@ export function buildCharacter(spec) {
       break;
     }
     case 'nvg': {
-      hair(false);
+      hair('fringe');
       add(head, taper(0.262, 0.285, 0.04, 0.29, 0.31), gear, 0, 0.065, -0.003);
       add(head, box(0.2, 0.075, 0.07), gear, 0, 0.012, 0.165);
       const lens = holo ? holoHot : M(0x061a0c, { glow: 0x4dff7a });
@@ -284,11 +263,11 @@ export function buildCharacter(spec) {
       break;
     }
     case 'shades':
-      hair(false);
+      hair('fringe');
       shades();
       break;
     case 'beret': {
-      hair(false);
+      hair('fringe');
       add(head, taper(0.262, 0.28, 0.035, 0.29, 0.305), M(mul(A, 0.6)), 0, 0.085, -0.003);
       add(head, prism(0.2, 0.17, 0.055, 6), accentM, 0.04, 0.135, -0.01, 0.05, 0.3, -0.24);
       add(head, box(0.035, 0.04, 0.012), M(0xc9a24a), -0.07, 0.1, 0.15).userData.noInk = true;
@@ -334,14 +313,89 @@ export function buildCharacter(spec) {
       add(head, taper(0.265, 0.268, 0.03, 0.295, 0.298), ink, 0, 0.122, -0.008, 0.06);
       break;
     }
+    case 'hood': {
+      const hm = M(P);
+      add(head, taper(0.27, 0.34, 0.2, 0.3, 0.35), hm, 0, 0.095, -0.03);
+      add(head, taper(0.34, 0.3, 0.17, 0.22, 0.17), hm, 0, -0.085, -0.1);
+      for (const s of [1, -1]) add(head, box(0.03, 0.21, 0.2), hm, s * 0.155, -0.04, 0.02);
+      add(head, taper(0.31, 0.34, 0.03, 0.07, 0.05), M(mul(P, 0.55)), 0, 0.085, 0.145);
+      break;
+    }
+    case 'bucket': {
+      add(head, taper(0.25, 0.29, 0.11, 0.27, 0.31), accentM, 0, 0.135, -0.005);
+      add(head, taper(0.33, 0.45, 0.05, 0.36, 0.48), accentM, 0, 0.068, -0.005);
+      add(head, taper(0.29, 0.295, 0.022, 0.31, 0.315), M(mul(A, 0.55)), 0, 0.1, -0.005);
+      add(head, taper(0.25, 0.2, 0.1, 0.06, 0.04), hairM, 0, -0.03, -0.14);
+      break;
+    }
+    case 'roundshades': {
+      hair('fringe');
+      for (const s of [1, -1]) {
+        add(head, prism(0.047, 0.047, 0.014, 8), M(0x050507), s * 0.062, -0.03, 0.15, Math.PI / 2);
+        add(head, box(0.012, 0.02, 0.15), M(0x050507), s * 0.14, -0.025, 0.07);
+      }
+      add(head, box(0.04, 0.01, 0.012), steel, 0, -0.022, 0.152).userData.noInk = true;
+      add(head, box(0.025, 0.008, 0.008), M(0xdfe8f0), 0.075, -0.015, 0.16).userData.noInk = true;
+      break;
+    }
+    case 'visorcap': {
+      add(head, taper(0.24, 0.28, 0.085, 0.27, 0.305), accentM, 0, 0.13, -0.008);
+      add(head, taper(0.25, 0.28, 0.016, 0.13, 0.17), M(mul(A, 0.5)), 0, 0.09, 0.2, 0.18);
+      add(head, taper(0.285, 0.265, 0.045, 0.045, 0.035), holo ? holoHot : M(0x060a0c, { glow: A }), 0, -0.03, 0.142).userData.noInk = true;
+      add(head, taper(0.25, 0.2, 0.1, 0.06, 0.04), hairM, 0, -0.03, -0.14);
+      break;
+    }
+    case 'headphones': {
+      hair('cropped');
+      add(head, taper(0.3, 0.33, 0.028, 0.05, 0.05), gear, 0, 0.172, 0);
+      for (const s of [1, -1]) {
+        add(head, box(0.022, 0.13, 0.035), gear, s * 0.158, 0.1, 0);
+        add(head, taper(0.06, 0.06, 0.12, 0.1, 0.1), accentM, s * 0.165, -0.01, 0);
+      }
+      add(head, box(0.012, 0.012, 0.12), gear, 0.165, -0.07, 0.06, 0.3).userData.noInk = true; // boom mic
+      break;
+    }
+    case 'flatcap': {
+      add(head, taper(0.27, 0.3, 0.065, 0.3, 0.34, 0.02), accentM, 0, 0.125, 0.0, 0.12);
+      add(head, taper(0.24, 0.27, 0.02, 0.07, 0.1), M(mul(A, 0.55)), 0, 0.082, 0.19, 0.28);
+      add(head, taper(0.25, 0.2, 0.1, 0.06, 0.04), hairM, 0, -0.03, -0.14);
+      break;
+    }
+    case 'cropped':
+      hair('cropped');
+      break;
+    case 'spiky':
+      hair('spiky');
+      break;
+    case 'ponytail': {
+      hair('fringe');
+      add(head, box(0.07, 0.05, 0.05), accentM, 0, 0.1, -0.17);
+      const t = group(head, 0, 0.1, -0.19);
+      add(t, taper(0.075, 0.055, 0.18, 0.06, 0.045), hairM, 0, -0.09, 0);
+      const t2 = group(t, 0, -0.18, 0);
+      add(t2, taper(0.055, 0.02, 0.17, 0.045, 0.02), hairM, 0, -0.085, 0);
+      t.rotation.set(0.5, 0, 0);
+      tails.push({ g: t, g2: t2, s: 0 });
+      break;
+    }
+    case 'goggles': {
+      hair('spiky');
+      add(head, taper(0.262, 0.285, 0.04, 0.29, 0.31), gear, 0, 0.075, -0.003);
+      const lens = holo ? holoHot : M(0x060a0c, { glow: A });
+      for (const s of [1, -1]) {
+        add(head, prism(0.05, 0.055, 0.05, 6), steel, s * 0.062, 0.085, 0.15, Math.PI / 2 - 0.25);
+        add(head, prism(0.036, 0.036, 0.012, 6), lens, s * 0.062, 0.092, 0.178, Math.PI / 2 - 0.25).userData.noInk = true;
+      }
+      break;
+    }
     case 'bald':
       break;
     default:
-      hair(false);
+      hair('fringe');
   }
   if (spec.shades && !masked && spec.head !== 'shades' && spec.head !== 'nvg' && spec.head !== 'visor') shades();
   if (spec.mustache && !masked && !holo) add(head, taper(0.07, 0.11, 0.028, 0.02, 0.025), hairM, 0, -0.118, 0.128);
-  if (o === 'burglar') add(head, taper(0.275, 0.272, 0.06, 0.3, 0.3), ink, 0, -0.03, 0.0); // domino mask
+  if (spec.scarf && !holo) add(torso, taper(0.24, 0.33, 0.1, 0.22, 0.29), M(spec.scarf), 0, 0.665, 0.012);
 
   // ---- outfit dressing: all hard-surface kit
   const belt = (m, pouches = 0) => {
@@ -375,59 +429,90 @@ export function buildCharacter(spec) {
     }
   };
 
-  if (o === 'sneak') {
-    // sneaking suit: harness, chest rig, pads, pouches
-    const rig = M(mul(P, 0.45));
+  if (o === 'rig') {
+    // tactical rig: harness, chest plates, pads, pouches
+    const rig = M(mul(P, 0.5));
     vest(rig, false);
     for (const s of [1, -1]) {
-      add(torso, box(0.04, 0.42, 0.02), gear, s * 0.075, 0.45, 0.143, 0.14, 0, s * 0.3);
+      add(torso, box(0.04, 0.42, 0.02), accentM, s * 0.075, 0.45, 0.143, 0.14, 0, s * 0.3);
       add(torso, box(0.04, 0.36, 0.02), gear, s * 0.1, 0.45, -0.135, -0.1, 0, s * -0.25);
     }
     add(torso, box(0.14, 0.09, 0.04), gear, -0.09, 0.36, 0.14);
-    add(torso, box(0.05, 0.11, 0.03), steel, 0.12, 0.47, 0.135, 0, 0, -0.3); // knife sheath
-    add(torso, box(0.17, 0.2, 0.07), gear, 0, 0.42, -0.165); // pack
+    add(torso, box(0.17, 0.2, 0.07), gear, 0, 0.42, -0.165);
     collar(rig, 0.07);
     belt(gear, 4);
     kneepads(gear);
     elbowpads(gear);
     shoulderpads(rig);
-    legs.forEach((l, i) => add(l.hip, box(0.05, 0.13, 0.11), gear, (i ? -1 : 1) * 0.09, -0.2, 0)); // thigh rig
-    arms.forEach((a) => add(a.el, taper(0.105, 0.095, 0.07, 0.11, 0.1), gear, 0, -0.215, 0)); // glove cuffs
-  } else if (o === 'burglar') {
-    add(torso, shard(0.19), M(0x5a4a34), 0.07, 0.42, -0.25, 0.3, 0.4, 0);
-    add(torso, box(0.05, 0.4, 0.02), M(0x3a2e20), 0.08, 0.46, 0.14, 0.1, 0, 0.5);
-    add(torso, box(0.1, 0.11, 0.012), accentM, 0.07, 0.4, -0.415).userData.noInk = true;
-    belt(accentM, 2);
-    collar(torsoM, 0.06);
-  } else if (o === 'tourist') {
-    add(pelvis, taper(0.375, 0.39, 0.14, 0.23, 0.24), torsoM, 0, 0.05, 0); // untucked hem
-    add(torso, taper(0.24, 0.12, 0.16, 0.012, 0.012), skin, 0, 0.56, 0.135, -0.1).userData.noInk = true; // open collar
-    add(torso, box(0.12, 0.085, 0.07), gear, 0, 0.34, 0.16);
-    add(torso, prism(0.032, 0.036, 0.04, 6), steel, 0, 0.34, 0.21, Math.PI / 2);
-    for (const s of [1, -1]) add(torso, box(0.015, 0.3, 0.012), gear, s * 0.06, 0.5, 0.135, 0.12, 0, s * -0.18);
-    legs.forEach((l) => add(l.knee, taper(0.128, 0.122, 0.12, 0.145, 0.135), M(0xd8d2c4), 0, -0.25, 0));
-  } else if (o === 'labcoat') {
-    coat(0.52);
-    collar(torsoM, 0.06);
-    add(torso, box(0.075, 0.065, 0.014), accentM, 0.11, 0.47, 0.135).userData.noInk = true;
-    add(torso, box(0.012, 0.075, 0.012), M(0xc1121f), 0.09, 0.515, 0.14).userData.noInk = true;
-    add(torso, box(0.012, 0.075, 0.012), M(0x2a6fd0), 0.115, 0.515, 0.14).userData.noInk = true;
-    belt(gear, 0);
-  } else if (o === 'recon') {
-    vest(accentM);
-    add(torso, taper(0.24, 0.32, 0.1, 0.22, 0.28), M(mul(A, 1.3)), 0, 0.665, 0.01); // shemagh
-    add(torso, taper(0.16, 0.05, 0.14, 0.03, 0.02), M(mul(A, 1.3)), 0.03, 0.58, 0.15, -0.1);
-    belt(M(0x2a2118), 4);
-    kneepads(gear);
-    shoulderpads(accentM);
-  } else if (o === 'trench') {
-    coat(0.74);
+    legs.forEach((l, i) => add(l.hip, box(0.05, 0.13, 0.11), gear, (i ? -1 : 1) * 0.09, -0.2, 0));
+  } else if (o === 'longcoat') {
+    coat(0.76);
     collar(torsoM, 0.15);
     belt(accentM, 0);
     for (const s of [1, -1]) {
-      add(torso, taper(0.11, 0.03, 0.26, 0.012, 0.012), M(mul(P, 0.6)), s * 0.07, 0.5, 0.142, -0.08, 0, s * 0.12); // lapels
-      add(arms[s === 1 ? 0 : 1].sh, taper(0.16, 0.17, 0.03, 0.17, 0.18), M(mul(P, 0.7)), 0, 0.05, 0); // epaulettes
+      add(torso, taper(0.11, 0.03, 0.26, 0.012, 0.012), M(mul(P, 0.6)), s * 0.07, 0.5, 0.142, -0.08, 0, s * 0.12);
+      add(arms[s === 1 ? 0 : 1].sh, taper(0.16, 0.17, 0.03, 0.17, 0.18), M(mul(P, 0.7)), 0, 0.05, 0);
     }
+    add(torso, taper(0.1, 0.05, 0.12, 0.012, 0.012), accentM, 0, 0.56, 0.14, -0.1).userData.noInk = true; // scarf knot
+  } else if (o === 'moto') {
+    // cropped jacket over an accent tee
+    add(torso, taper(0.378, 0.338, 0.21, 0.218, 0.208), accentM, 0, 0.18, 0);
+    add(torso, taper(0.54, 0.41, 0.3, 0.285, 0.235), torsoM, 0, 0.44, 0.002);
+    add(torso, box(0.018, 0.3, 0.012), steel, 0.05, 0.44, 0.148, 0, 0, -0.28).userData.noInk = true;
+    for (const s of [1, -1]) add(torso, taper(0.1, 0.04, 0.16, 0.012, 0.012), M(mul(P, 0.6)), s * 0.09, 0.53, 0.147, -0.06, 0, s * 0.3).userData.noInk = true;
+    collar(torsoM, 0.07);
+    shoulderpads(M(mul(P, 0.65)));
+    arms.forEach((a) => add(a.el, taper(0.108, 0.098, 0.05, 0.112, 0.102), M(mul(P, 0.65)), 0, -0.215, 0));
+    belt(gear, 1);
+    legs.forEach((l) => add(l.knee, taper(0.135, 0.14, 0.05, 0.155, 0.175), accentM, 0, -0.31, 0.005));
+  } else if (o === 'parka') {
+    add(torso, taper(0.57, 0.45, 0.34, 0.31, 0.275), torsoM, 0, 0.43, 0);
+    add(pelvis, taper(0.44, 0.47, 0.27, 0.275, 0.295), torsoM, 0, 0.0, 0);
+    add(torso, taper(0.36, 0.45, 0.09, 0.3, 0.35), M(0xd8d2c4), 0, 0.668, -0.01); // fur trim
+    add(torso, taper(0.24, 0.31, 0.15, 0.1, 0.13), torsoM, 0, 0.62, -0.18, -0.3); // hood, down
+    for (const s of [1, -1]) add(pelvis, box(0.12, 0.1, 0.03), M(mul(P, 0.7)), s * 0.12, 0.0, 0.142);
+    add(torso, box(0.024, 0.52, 0.012), accentM, 0, 0.36, 0.16).userData.noInk = true;
+    arms.forEach((a) => {
+      add(a.sh, taper(0.17, 0.15, 0.26, 0.17, 0.15), torsoM, 0, -0.13, 0);
+      add(a.el, taper(0.115, 0.105, 0.05, 0.12, 0.11), accentM, 0, -0.215, 0);
+    });
+  } else if (o === 'suit') {
+    add(torso, taper(0.17, 0.05, 0.3, 0.012, 0.012), M(0xe0dacb), 0, 0.46, 0.142, -0.07).userData.noInk = true;
+    add(torso, taper(0.045, 0.03, 0.26, 0.014, 0.014), accentM, 0, 0.45, 0.148, -0.07).userData.noInk = true; // tie
+    for (const s of [1, -1]) add(torso, taper(0.12, 0.03, 0.28, 0.012, 0.012), M(mul(P, 0.6)), s * 0.09, 0.47, 0.146, -0.07, 0, s * 0.15).userData.noInk = true;
+    add(torso, box(0.05, 0.02, 0.012), accentM, 0.13, 0.5, 0.14).userData.noInk = true; // pocket square
+    coat(0.24);
+    collar(M(0xe0dacb), 0.05);
+    belt(ink, 0);
+  } else if (o === 'techvest') {
+    vest(M(P));
+    add(torso, box(0.3, 0.02, 0.012), accentM, 0, 0.52, 0.152).userData.noInk = true;
+    add(torso, box(0.03, 0.03, 0.012), M(0x0a0a0a, { glow: A }), 0.13, 0.46, 0.15).userData.noInk = true;
+    for (const s of [1, -1]) add(torso, box(0.04, 0.34, 0.02), gear, s * 0.13, 0.46, -0.14);
+    add(torso, box(0.2, 0.22, 0.08), M(mul(P, 0.7)), 0, 0.42, -0.17); // slim pack
+    collar(M(mul(P, 0.5)), 0.08);
+    belt(gear, 4);
+    kneepads(M(P));
+    arms.forEach((a) => add(a.el, taper(0.108, 0.1, 0.1, 0.112, 0.104), M(P), 0, -0.17, 0)); // bracers
+  } else if (o === 'jumpsuit') {
+    add(torso, box(0.022, 0.5, 0.012), accentM, 0, 0.38, 0.143).userData.noInk = true; // zip
+    add(pelvis, box(0.022, 0.14, 0.012), accentM, 0, 0.02, 0.108).userData.noInk = true;
+    for (const s of [1, -1]) {
+      add(torso, box(0.09, 0.08, 0.02), M(mul(P, 0.7)), s * 0.12, 0.48, 0.138);
+      add(legs[s === 1 ? 0 : 1].hip, box(0.03, 0.14, 0.12), M(mul(P, 0.7)), s * 0.085, -0.22, 0);
+    }
+    collar(torsoM, 0.07);
+    belt(accentM, 2);
+    arms.forEach((a) => add(a.el, taper(0.112, 0.108, 0.06, 0.116, 0.112), M(mul(P, 0.7)), 0, -0.02, 0)); // rolled cuffs
+    kneepads(M(mul(P, 0.6)));
+    add(torso, box(0.08, 0.03, 0.012), M(0xe0dacb), -0.12, 0.54, 0.14).userData.noInk = true; // name tape
+  } else if (o === 'poncho') {
+    add(torso, taper(0.34, 0.84, 0.5, 0.3, 0.6), M(P), 0, 0.43, 0);
+    add(torso, taper(0.845, 0.87, 0.04, 0.605, 0.625), accentM, 0, 0.175, 0);
+    add(torso, taper(0.26, 0.36, 0.1, 0.24, 0.32), M(mul(P, 0.7)), 0, 0.67, 0.01);
+    add(torso, box(0.03, 0.26, 0.012), accentM, 0, 0.5, 0.21, 0.33).userData.noInk = true;
+    belt(gear, 0);
+    kneepads(gear);
   } else if (o === 'polo') {
     vest(M(0x15181e));
     collar(torsoM, 0.05);
@@ -482,7 +567,7 @@ export function buildCharacter(spec) {
       m.add(l);
     }
   } else {
-    inkAll(root, spec.ink ?? 0.011);
+    inkAll(root, spec.ink ?? 0.007);
   }
 
   const rig = { root, body, pelvis, torso, head, armL, armR, legL, legR, tails, phase: 0, j: null, height: 1.88 * build.h, holo };
@@ -492,11 +577,11 @@ export function buildCharacter(spec) {
 }
 
 /** Draw the character again where it is hidden by walls, as a ghostly silhouette. */
-export function addSilhouette(rig, color = 0x19f0e0) {
+export function addSilhouette(rig, color = 0x5cf0b0) {
   // Inverted depth test: draws only where something nearer hides the body.
   // The depth used for that test is pulled 0.7 m towards the camera so the
   // character's own limbs never count as "something nearer".
-  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
+  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4, depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <project_vertex>',
@@ -675,26 +760,70 @@ export function settleCharacter(rig, p) {
 /** three.js yaw for a core heading angle (direction = cos a, sin a in XZ). */
 export const yawOf = (ang) => Math.PI / 2 - ang;
 
-/** Guard look for a theme, with randomised kit. */
+const GUARD_LOOKS = {
+  yacht: {
+    outfits: ['polo', 'polo', 'suit', 'techvest', 'moto'],
+    primary: [0x2a3a40, 0x1f3a3a, 0x3a3f48, 0xd8d2c4, 0x22304a],
+    accent: [0xe8a020, 0x14181e, 0xc9a24a, 0xe8e0cc],
+    heads: ['cap', 'cap', 'cropped', 'bald', 'beret', 'bucket', 'roundshades', 'flatcap'],
+    shades: 0.6,
+  },
+  office: {
+    outfits: ['rentacop', 'rentacop', 'suit', 'longcoat', 'moto'],
+    primary: [0x4a5a68, 0x3a4a4a, 0x56607a, 0x6a6458, 0x2a2a32],
+    accent: [0x14161e, 0x5cf0b0, 0xc9a24a, 0x7ac8ff],
+    heads: ['cap', 'cap', 'cropped', 'bald', 'fedora', 'flatcap', 'headphones', 'hair'],
+    shades: 0.25,
+  },
+  lab: {
+    outfits: ['hazmat', 'hazmat', 'jumpsuit', 'parka', 'techvest'],
+    primary: [0xa8801a, 0x8a929a, 0x5a7a22, 0x3a6a5a, 0xc8c0ae],
+    accent: [0x5cf0b0, 0x23282c, 0xe8e0cc, 0xff9a3a],
+    heads: ['gasmask', 'gasmask', 'visor', 'goggles', 'hood', 'visorcap'],
+    shades: 0,
+  },
+  bunker: {
+    outfits: ['fatigues', 'fatigues', 'rig', 'poncho', 'parka'],
+    primary: [0x5a6238, 0x6e6040, 0x4c5434, 0x3a4a3a, 0x8a4a2a],
+    accent: [0xe8a020, 0x16301c, 0xe0562a, 0xd8c090],
+    heads: ['balaclava', 'balaclava', 'beret', 'helmet', 'visor', 'bucket', 'goggles', 'beanie'],
+    shades: 0.2,
+  },
+  museum: {
+    outfits: ['tux', 'tux', 'longcoat', 'suit'],
+    primary: [0x16161c, 0x1f2a26, 0x2a2a32, 0x3a2a22],
+    accent: [0x7a0f1c, 0xc9a24a, 0xe8e0cc, 0x2fa87a],
+    heads: ['hair', 'fedora', 'bald', 'shades', 'flatcap', 'cropped', 'ponytail', 'roundshades'],
+    shades: 0.3,
+  },
+  vr: {
+    outfits: ['fatigues', 'rig', 'longcoat', 'techvest', 'jumpsuit'],
+    primary: [0x22e6d2],
+    accent: [0x22e6d2],
+    heads: ['helmet', 'visor', 'balaclava', 'cap', 'hood', 'goggles'],
+    shades: 0,
+  },
+};
+
+/** Guard look for a theme: a random outfit, palette, headgear, build and extras. */
 export function guardSpec(themeId, rng) {
-  const skin = rng.pick(SKIN_TONES);
-  const build = rng.pick(['standard', 'standard', 'stocky', 'tall', 'tall']);
-  const hairColor = rng.pick([0x15110e, 0x0a0a0a, 0x3a2616, 0x5a4a30, 0x6a6a6a, 0x4a1c10]);
-  const base = { skin, build, hairColor, mustache: rng.chance(0.3), stubble: rng.chance(0.5), shades: rng.chance(0.3), rim: 0xffd9a8, rimStrength: 0.35 };
-  switch (themeId) {
-    case 'yacht':
-      return { ...base, outfit: 'polo', primary: rng.pick([0x2a3442, 0x3a3f48, 0x4a2a2a]), accent: rng.pick([0x14181e, 0x1d2c4a, 0x5a1616]), head: rng.pick(['cap', 'cap', 'hair', 'bald', 'beret']), shades: rng.chance(0.8) };
-    case 'office':
-      return { ...base, outfit: 'rentacop', primary: rng.pick([0x4a5a78, 0x56607a, 0x6a6458]), accent: rng.pick([0x14161e, 0x1a1a1a, 0x1c2638]), head: rng.pick(['cap', 'cap', 'hair', 'bald', 'fedora']) };
-    case 'lab':
-      return { ...base, outfit: 'hazmat', primary: rng.pick([0xa8801a, 0x9a5216, 0x6a6e66, 0x5a7a22]), accent: 0x23282c, head: rng.pick(['gasmask', 'gasmask', 'visor']) };
-    case 'bunker':
-      return { ...base, outfit: 'fatigues', primary: rng.pick([0x5a6238, 0x6e6040, 0x4c5434]), accent: rng.pick([0x6a1414, 0x16301c, 0x1c1c3a, 0x2a2016]), head: rng.pick(['balaclava', 'balaclava', 'beret', 'helmet', 'visor']) };
-    case 'museum':
-      return { ...base, outfit: 'tux', primary: 0x0e0e12, accent: rng.pick([0x7a0f1c, 0x0e0e12, 0x8a6a2c, 0x16264a]), head: rng.pick(['hair', 'fedora', 'bald', 'shades', 'fedora']), mustache: rng.chance(0.5) };
-    default:
-      return { ...base, outfit: 'fatigues', primary: 0x22e6d2, accent: 0x22e6d2, head: rng.pick(['helmet', 'visor', 'balaclava', 'cap']), holo: true, build: rng.pick(['standard', 'tall', 'stocky']) };
-  }
+  const look = GUARD_LOOKS[themeId] || GUARD_LOOKS.vr;
+  return {
+    skin: rng.pick(SKIN_TONES),
+    build: rng.pick(['standard', 'standard', 'stocky', 'tall', 'tall', 'slim']),
+    hairColor: rng.pick(HAIR_COLORS.slice(0, 6)),
+    outfit: rng.pick(look.outfits),
+    primary: rng.pick(look.primary),
+    accent: rng.pick(look.accent),
+    head: rng.pick(look.heads),
+    mustache: rng.chance(0.3),
+    stubble: rng.chance(0.5),
+    shades: rng.chance(look.shades),
+    scarf: rng.chance(0.18) ? rng.pick(look.accent) : 0,
+    holo: themeId === 'vr',
+    rim: 0xffe2b8,
+    rimStrength: 0.3,
+  };
 }
 
 /** Convert saved agent settings into a character spec. */
@@ -706,10 +835,10 @@ export function agentSpec(agent) {
     primary: agent.primary,
     accent: agent.accent,
     head: agent.head,
-    hairColor: 0x15110e,
-    stubble: true,
-    rim: 0xa8f0ff,
-    rimStrength: 0.55,
-    ink: 0.013,
+    hairColor: HAIR_COLORS[agent.hair] ?? HAIR_COLORS[0],
+    stubble: false,
+    rim: 0xc8ffe8,
+    rimStrength: 0.3,
+    ink: 0.008,
   };
 }

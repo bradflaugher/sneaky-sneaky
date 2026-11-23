@@ -1,24 +1,33 @@
 // localStorage persistence: agent look, loot vault, stats, settings.
 
-import { DEFAULT_AGENT } from '../render/character.js';
+import { randomAgent, normalizeAgent, isLegacyDefault } from '../core/agent.js';
 import { DEFAULT_SETUP, normalizeSetup } from '../core/difficulty.js';
 import { LOOT, LOOT_BY_ID } from '../core/loot.js';
 
 const KEY = 'sneaky-sneaky:v1';
 
 const fresh = () => ({
-  agent: { ...DEFAULT_AGENT },
+  agent: randomAgent(), // a brand new player is dealt a fresh original
+  agentConfirmed: false, // true once they have picked on the Select Your Agent screen
   vault: {}, // lootId -> { name, rarity, serial, tagline, venue, sector, theme, count, best, at }
   stats: { rooms: 0, ghosts: 0, bestStreak: 0, knockouts: 0, heists: 0 },
   settings: { mute: false, cam: 'chase', setup: { ...DEFAULT_SETUP } },
 });
 
-export function loadSave() {
+/**
+ * Load the save. `storage` is injectable for tests; anything with getItem works.
+ * A player with no saved agent (or only the old hardcoded default they never
+ * chose) starts with a random one and `agentConfirmed: false`.
+ */
+export function loadSave(storage = globalThis.localStorage) {
   const base = fresh();
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
+    const raw = JSON.parse((storage && storage.getItem(KEY)) || 'null');
     if (raw && typeof raw === 'object') {
-      Object.assign(base.agent, raw.agent);
+      if (raw.agent && !(isLegacyDefault(raw.agent) && raw.agentConfirmed !== true)) {
+        base.agent = normalizeAgent(raw.agent, base.agent);
+        base.agentConfirmed = raw.agentConfirmed === true;
+      }
       Object.assign(base.vault, raw.vault);
       Object.assign(base.stats, raw.stats);
       Object.assign(base.settings, raw.settings);
@@ -34,6 +43,8 @@ export function loadSave() {
       if (!base.stats.heists) base.stats.heists = Object.values(base.vault).reduce((n, e) => n + (e.count || 0), 0);
       base.settings.setup = normalizeSetup({ theme: raw.settings?.theme, ...(raw.settings?.setup || {}) });
       delete base.settings.theme;
+      if (base.settings.style === 'ps1') base.settings.style = 'noir';
+      if (base.settings.style === 'crisp') base.settings.style = 'clean';
     }
   } catch {
     // corrupted or unavailable storage: start fresh
@@ -41,9 +52,15 @@ export function loadSave() {
   return base;
 }
 
-export function storeSave(save) {
+/** Lock in the chosen agent: later runs skip the select screen. */
+export function confirmAgent(save) {
+  save.agentConfirmed = true;
+  return save;
+}
+
+export function storeSave(save, storage = globalThis.localStorage) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(save));
+    storage.setItem(KEY, JSON.stringify(save));
   } catch {
     // storage full or blocked: the game still works, it just forgets
   }

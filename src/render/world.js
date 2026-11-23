@@ -6,7 +6,7 @@ import { WALL, cellAt } from '../core/grid.js';
 import { RNG } from '../core/rng.js';
 import { ART, VENT_COLORS, WALL_H } from './themeArt.js';
 import { floorTexture, wallTexture, miscTexture, skylineTexture, skyTexture, glowTexture, poolTexture, shaftTexture, paintedTexture } from './textures.js';
-import { toon, glowToon, inkEdges, inkAll } from './toon.js';
+import { toon, glowToon, inkAll } from './toon.js';
 import { buildLootProp } from './lootProps.js';
 import { LOOT_BY_ID } from '../core/loot.js';
 
@@ -171,10 +171,13 @@ export function buildWorld(room, { lowPower = false } = {}) {
   // ------------------------------------------------------------ floor
   {
     const tex = floorTexture(art.floor).clone();
-    tex.repeat.set(w / 2, h / 2);
+    tex.repeat.set(w / 4, h / 4); // one texture covers 4 m: broad, calm panels
     tex.needsUpdate = true;
     // VR is unlit phosphor on black, exactly as drawn
-    const mat = room.themeId === 'vr' ? new THREE.MeshBasicMaterial({ map: tex }) : std(0xffffff, { map: tex });
+    // Elsewhere the floor is the one PBR surface: a soft sheen lets lamp pools
+    // bloom across the dark instead of stepping in toon bands.
+    const glossy = art.floor === 'marble' || art.floor === 'tile' || art.floor === 'teak';
+    const mat = room.themeId === 'vr' ? new THREE.MeshBasicMaterial({ map: tex }) : new THREE.MeshStandardMaterial({ map: tex, roughness: glossy ? 0.42 : 0.72, metalness: glossy ? 0.12 : 0 });
     const f = mesh(new THREE.PlaneGeometry(w, h), mat, group, false);
     f.rotation.x = -Math.PI / 2;
     f.position.set(w / 2, 0, h / 2);
@@ -190,7 +193,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     wallMat.emissiveIntensity = 0.9;
     wallMat.color.setHex(0x0a1416);
   }
-  const capMat = art.capGlow ? matOf({ color: 0x031416, emissive: art.cap, emissiveIntensity: 0.12 }) : std(art.cap, { roughness: 0.55, metalness: art.capMetal || 0.1 });
+  const capMat = art.capGlow ? matOf({ color: 0x021008, emissive: art.cap, emissiveIntensity: 0.05 }) : std(art.cap, { roughness: 0.55, metalness: art.capMetal || 0.1 });
   const wallGeos = [];
   const capGeos = [];
   const solidOuter = art.outer === 'solid';
@@ -198,16 +201,14 @@ export function buildWorld(room, { lowPower = false } = {}) {
     wallGeos.push(wallBox(r.x, 0, r.y, r.x + r.w, WALL_H, r.y + r.h));
     capGeos.push(new THREE.BoxGeometry(r.w + 0.08, 0.09, r.h + 0.08).translate(r.x + r.w / 2, WALL_H + 0.045, r.y + r.h / 2));
   }
-  const innerWalls = merged(wallGeos, wallMat);
-  if (innerWalls) inkEdges(innerWalls);
-  const innerCaps = merged(capGeos, capMat, false);
-  if (innerCaps) inkEdges(innerCaps);
+  merged(wallGeos, wallMat);
+  merged(capGeos, capMat, false);
 
   // The four outer walls are separate groups so whichever ones stand between
   // the camera and the room can sink out of the way (dollhouse cutaway).
   const railMat = std(0xb8862a);
   const frameMat = std(0x0c0d12);
-  const glassMat = std(0x5a78c8, { transparent: true, opacity: 0.1, depthWrite: false });
+  const glassMat = std(0x4ac8b0, { transparent: true, opacity: 0.07, depthWrite: false });
   const sides = [
     { r: { x: 0, y: 0, w, h: 1 }, hidden: (c) => c.z < 0.5 },
     { r: { x: 0, y: h - 1, w, h: 1 }, hidden: (c) => c.z > h - 0.5 },
@@ -222,7 +223,6 @@ export function buildWorld(room, { lowPower = false } = {}) {
     side.sink = 0;
     const add = (geo, mat, shadow = true) => {
       const m = mesh(geo, mat, g, shadow);
-      if (!mat.transparent) inkEdges(m);
       return m;
     };
     const long = r.w >= r.h;
@@ -264,21 +264,21 @@ export function buildWorld(room, { lowPower = false } = {}) {
     crate: std(0xffffff, { map: miscTexture('crate') }),
     ammo: std(0xffffff, { map: miscTexture('ammo') }),
     fabric: std(0x4a5670, { map: miscTexture('fabric') }),
-    white: std(0x8a8880, { map: miscTexture('metal') }),
-    leather: std(0x6a1218),
+    white: std(0x6f7872, { map: miscTexture('metal') }),
+    leather: std(0x8a7a5a),
     brass: std(0xb8862a),
     metal: std(0xffffff, { map: miscTexture('metal') }),
     darkmetal: std(0x1a1d22),
-    labwhite: std(0x9aa8a2, { map: miscTexture('metal') }),
+    labwhite: std(0x6f8880, { map: miscTexture('metal') }),
     sandbag: std(0x7a6646, { map: miscTexture('fabric') }),
-    marble: std(0xb0aa9e),
+    marble: std(0x8f958a),
     darkmarble: std(0x14131a),
-    velvet: std(0x7a0f1c),
+    velvet: std(0x4e0b16),
     glass: std(0x9fc8ff, { transparent: true, opacity: 0.16 }),
     leaf: std(0x1f4a2a),
     screen: glowMat(art.glow, 1.6),
     warm: glowMat(0xffb040, 2),
-    accent: std(room.themeId === 'yacht' ? 0x16264a : 0x9a1420),
+    accent: std(art.accent),
     holo: new THREE.MeshBasicMaterial({ color: 0x010b0d, transparent: true, opacity: 0.9 }),
     gold: std(0xc9a24a),
   };
@@ -294,8 +294,6 @@ export function buildWorld(room, { lowPower = false } = {}) {
     m.castShadow = shadow;
     m.receiveShadow = true;
     parent.add(m);
-    // hard-surface parts get inked crease lines
-    if (shadow && !mat.transparent && (geo === unitBox || geo === unitCyl)) inkEdges(m);
     return m;
   };
 
@@ -498,7 +496,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
         const m = b(M.holo, cw - 0.1, 1.02, ch - 0.1, 0, 0.51, 0);
         const e = new THREE.LineSegments(edgeGeo, lineMat);
         m.add(e);
-        b(glowMat(art.glow, 1.4), cw - 0.5, 0.02, ch - 0.5, 0, 1.035, 0, false);
+        b(glowMat(art.glow, 0.35), cw - 0.5, 0.02, ch - 0.5, 0, 1.035, 0, false);
       }
     }
     group.add(g);
@@ -531,7 +529,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     for (let y = c.y; y < c.y + c.h; y++)
       for (let x = c.x; x < c.x + c.w; x++) {
         const edge = x === c.x || y === c.y || x === c.x + c.w - 1 || y === c.y + c.h - 1;
-        if (!edge || gadgetCells.has(`${x},${y}`) || !rng.chance(0.3)) continue;
+        if (!edge || gadgetCells.has(`${x},${y}`) || !rng.chance(0.15)) continue;
         for (const [dx, dy] of [
           [1, 0],
           [-1, 0],
@@ -631,12 +629,20 @@ export function buildWorld(room, { lowPower = false } = {}) {
       l.position.set(s.x, 3.0, s.z);
       group.add(l);
     }
-    const pool = decal(art.lamp[0], 6.2, s.x, s.z, 0.13, 0.021, poolTex);
-    if (room.themeId === 'lab' && i % 3 === 1) animated.push((t) => (pool.material.opacity = Math.sin(t * 31 + i) > 0.86 ? 0.03 : 0.13)); // a dying tube
-    if (room.themeId === 'museum' || room.themeId === 'bunker' || room.themeId === 'yacht') {
-      const sf = shaft(art.lamp[0], s.x + (room.themeId === 'bunker' ? 0.9 : 0), s.z, 2.1, 6.5, 0.07);
-      if (room.themeId === 'bunker') sf.rotation.z = 0.28;
-    }
+    // a soft pool on the floor and a faint volumetric shaft above it
+    const pool = decal(art.lamp[0], 7, s.x, s.z, 0.2);
+    const lean = room.themeId === 'bunker' ? 0.3 : room.themeId === 'yacht' ? 0.12 : 0;
+    const sf = shaft(art.lamp[0], s.x + lean * 3, s.z, 2.3, 7, 0.06);
+    sf.rotation.z = lean;
+    const ph = rng.range(0, 6);
+    const dying = room.themeId === 'lab' && i % 4 === 1;
+    animated.push((t) => {
+      // shafts drift and breathe, never strobe
+      const k = 0.8 + 0.2 * Math.sin(t * 0.45 + ph);
+      sf.material.opacity = 0.06 * k;
+      sf.rotation.z = lean + Math.sin(t * 0.21 + ph) * 0.025;
+      pool.material.opacity = (dying && Math.sin(t * 23 + i) > 0.9 ? 0.06 : 0.2) * (0.9 + 0.1 * k);
+    });
   });
 
   // Storm rain: short hard streaks.
@@ -665,7 +671,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
   const loot = new THREE.Group();
   loot.position.set(room.loot.x, 1.0, room.loot.z);
   const prop = buildLootProp(room.loot.info || lootPropOf(room));
-  inkAll(prop, 0.007);
+  inkAll(prop, 0.005);
   prop.scale.setScalar(1.25);
   loot.add(prop);
   group.add(loot);

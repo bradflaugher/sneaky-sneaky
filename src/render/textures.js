@@ -1,7 +1,9 @@
-// Procedural pixel-art textures. Nothing is downloaded: every surface is
-// painted here at load time, at deliberately low resolution (64-128 px) and
-// sampled with nearest-neighbour filtering so texels stay crisp and chunky,
-// PS1 style. Palettes are dark and dirty: grime, stains, cracks, ink hatching.
+// Procedural textures. Nothing is downloaded: every surface is painted here at
+// load time and sampled crisply (nearest-neighbour magnification).
+//
+// Surfaces are deliberately CALM: large architectural panels, hairline seams,
+// gentle tonal drift and a whisper of wear. The eye should land on the agent,
+// the guards, their cones and the loot, never on the floor.
 
 import * as THREE from 'three';
 import { RNG } from '../core/rng.js';
@@ -31,64 +33,51 @@ const css = (hex, a = 1) => `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex
 const R = Math.round;
 
 /**
- * The grime pass every surface gets: chunky per-texel noise, diagonal ink
- * hatching, dark stains, hairline cracks and drips.
+ * The wear pass: barely-there texel variation plus a few large, soft tonal
+ * blooms. `hatch`, `drips` and `scratches` are accepted for older callers but
+ * intentionally do very little; busy surfaces fight the characters.
  */
-function grit(g, s, rng, { noise = 16, hatch = 0.2, stains = 5, cracks = 2, drips = 0, scratches = 0 } = {}) {
+function grit(g, s, rng, { noise = 16, stains = 5, cracks = 2 } = {}) {
+  const amp = Math.max(1, Math.round(noise * 0.22));
   const img = g.getImageData(0, 0, s, s);
   const d = img.data;
-  for (let y = 0; y < s; y++)
-    for (let x = 0; x < s; x++) {
-      const i = (y * s + x) * 4;
-      // three-level noise reads as texture rather than fuzz
-      let n = (Math.floor(rng.next() * 3) - 1) * noise;
-      if ((x + y) % 4 === 0 && rng.chance(hatch)) n -= noise * 1.6;
-      if ((x - y + s) % 6 === 0 && rng.chance(hatch * 0.5)) n -= noise;
-      d[i] = Math.max(0, Math.min(255, d[i] + n));
-      d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
-      d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+  for (let y = 0; y < s; y += 2)
+    for (let x = 0; x < s; x += 2) {
+      const n = (rng.next() - 0.5) * 2 * amp;
+      for (const o of [0, 4, s * 4, s * 4 + 4]) {
+        const i = (y * s + x) * 4 + o;
+        if (i + 2 >= d.length) continue;
+        d[i] = Math.max(0, Math.min(255, d[i] + n));
+        d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+        d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+      }
     }
   g.putImageData(img, 0, 0);
-  for (let i = 0; i < stains; i++) {
-    g.fillStyle = `rgba(0,0,0,${rng.range(0.12, 0.3)})`;
+  for (let i = 0; i < Math.min(3, Math.ceil(stains / 3)); i++) {
     const cx = rng.range(0, s);
     const cy = rng.range(0, s);
-    for (let k = 0; k < 14; k++) {
-      const r = rng.range(1, s * 0.07);
-      g.fillRect(R(cx + rng.range(-s * 0.08, s * 0.08)), R(cy + rng.range(-s * 0.08, s * 0.08)), R(r), R(r * rng.range(0.5, 1.5)));
-    }
+    const r = rng.range(s * 0.18, s * 0.4);
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const dark = rng.chance(0.7);
+    gr.addColorStop(0, dark ? 'rgba(0,0,0,0.11)' : 'rgba(255,255,255,0.04)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, s, s);
   }
-  for (let i = 0; i < cracks; i++) {
-    g.fillStyle = 'rgba(0,0,0,0.7)';
+  for (let i = 0; i < Math.floor(cracks / 3); i++) {
+    g.fillStyle = 'rgba(0,0,0,0.22)';
     let x = rng.range(0, s);
     let y = rng.range(0, s);
     let dx = rng.range(-1, 1);
     let dy = rng.range(-1, 1);
-    for (let k = 0; k < s * 0.6; k++) {
+    for (let k = 0; k < s * 0.3; k++) {
       g.fillRect(R(x), R(y), 1, 1);
-      if (rng.chance(0.3)) dx += rng.range(-0.6, 0.6);
-      if (rng.chance(0.3)) dy += rng.range(-0.6, 0.6);
+      if (rng.chance(0.2)) dx += rng.range(-0.5, 0.5);
+      if (rng.chance(0.2)) dy += rng.range(-0.5, 0.5);
       const m = Math.hypot(dx, dy) || 1;
       x += dx / m;
       y += dy / m;
     }
-  }
-  for (let i = 0; i < drips; i++) {
-    const x = R(rng.range(0, s));
-    const y0 = R(rng.range(0, s * 0.5));
-    const len = R(rng.range(s * 0.1, s * 0.45));
-    for (let k = 0; k < len; k++) {
-      g.fillStyle = `rgba(0,0,0,${0.4 * (1 - k / len)})`;
-      g.fillRect(x, y0 + k, k < len * 0.3 ? 2 : 1, 1);
-    }
-  }
-  for (let i = 0; i < scratches; i++) {
-    g.fillStyle = `rgba(255,255,255,${rng.range(0.06, 0.16)})`;
-    const x = R(rng.range(0, s));
-    const y = R(rng.range(0, s));
-    const len = R(rng.range(3, s * 0.2));
-    const diag = rng.chance(0.5);
-    for (let k = 0; k < len; k++) g.fillRect(x + k, y + (diag ? k >> 1 : 0), 1, 1);
   }
 }
 
@@ -108,179 +97,135 @@ function shade(g, s, top, bottom) {
   g.fillRect(0, 0, s, s);
 }
 
-// ------------------------------------------------------------------ floors (128px = 2m)
+// ------------------------------------------------------------------ floors
+// One texture spans 4 m x 4 m, so its 2 m panels read as architecture, not noise.
+
+/** n x n panels with a soft tonal drift and hairline seams. */
+function panels(g, s, rng, n, tones, seam, drift = 4) {
+  const t = s / n;
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const base = tones[(x + y) % tones.length];
+      const v = rng.int(-drift, drift);
+      g.fillStyle = `rgb(${base[0] + v},${base[1] + v},${base[2] + v})`;
+      g.fillRect(x * t, y * t, t, t);
+      // a faint top-left to bottom-right lift gives each panel a little form
+      const gr = g.createLinearGradient(x * t, y * t, x * t + t, y * t + t);
+      gr.addColorStop(0, 'rgba(255,255,255,0.035)');
+      gr.addColorStop(1, 'rgba(0,0,0,0.05)');
+      g.fillStyle = gr;
+      g.fillRect(x * t, y * t, t, t);
+    }
+  g.fillStyle = seam;
+  for (let i = 0; i <= n; i++) {
+    g.fillRect(R(i * t) - (i === n ? 1 : 0), 0, 1, s);
+    g.fillRect(0, R(i * t) - (i === n ? 1 : 0), s, 1);
+  }
+}
 
 const FLOORS = {
-  // rain-slicked dark teak
+  // rain-dark deck planking, stained deep ocean teal
   teak(g, s, rng) {
-    fill(g, s, '#3a2416');
     const planks = 8;
     const ph = s / planks;
     for (let i = 0; i < planks; i++) {
-      const v = rng.int(-10, 10);
-      rect(g, `rgb(${62 + v},${38 + v},${22 + v})`, 0, i * ph, s, ph);
-      for (let k = 0; k < 5; k++) rect(g, 'rgba(0,0,0,0.22)', rng.range(0, s), i * ph + rng.range(2, ph - 2), rng.range(8, 40), 1);
-      for (let k = 0; k < 2; k++) rect(g, 'rgba(160,190,220,0.13)', rng.range(0, s), i * ph + rng.range(2, ph - 2), rng.range(6, 26), 1);
-      rect(g, '#0b0705', 0, i * ph, s, 1);
-      rect(g, '#0b0705', rng.range(0, s), i * ph, 1, ph);
+      const v = rng.int(-5, 5);
+      g.fillStyle = `rgb(${34 + v},${60 + v},${56 + v})`;
+      g.fillRect(0, i * ph, s, ph);
+      g.fillStyle = 'rgba(4,14,14,0.75)';
+      g.fillRect(0, R(i * ph), s, 1);
+      g.fillRect(R(rng.range(0, s)), R(i * ph), 1, ph);
     }
-    grit(g, s, rng, { noise: 9, stains: 7, cracks: 0, hatch: 0.12 });
+    grit(g, s, rng, { noise: 9, stains: 6, cracks: 0 });
   },
-  // charcoal office carpet tiles
+  // emerald-slate carpet in broad panels
   carpet(g, s, rng) {
-    fill(g, s, '#2c3146');
-    for (let y = 0; y < 2; y++)
-      for (let x = 0; x < 2; x++) rect(g, (x + y) % 2 ? '#292e41' : '#31374e', x * (s / 2), y * (s / 2), s / 2, s / 2);
-    grit(g, s, rng, { noise: 12, stains: 4, cracks: 0, hatch: 0.35 });
-    for (let i = 0; i <= 2; i++) {
-      rect(g, '#07080c', i * (s / 2) - 1, 0, 1, s);
-      rect(g, '#07080c', 0, i * (s / 2) - 1, s, 1);
-    }
+    panels(g, s, rng, 2, [[38, 54, 50], [42, 60, 55]], 'rgba(8,18,16,0.7)', 2);
+    grit(g, s, rng, { noise: 10, stains: 3, cracks: 0 });
   },
-  // cracked, stained bio-bunker concrete
+  // jade-obsidian containment floor with mint hairlines
   tile(g, s, rng) {
-    fill(g, s, '#3d4541');
-    const n = 2;
-    const t = s / n;
-    for (let y = 0; y < n; y++)
-      for (let x = 0; x < n; x++) {
-        const v = rng.int(-9, 9);
-        rect(g, `rgb(${64 + v},${72 + v},${68 + v})`, x * t + 1, y * t + 1, t - 2, t - 2);
-      }
-    grit(g, s, rng, { noise: 13, stains: 10, cracks: 5, hatch: 0.18 });
-    for (let i = 0; i < 3; i++) rect(g, 'rgba(70,200,140,0.10)', rng.range(0, s), rng.range(0, s), rng.range(6, 18), rng.range(4, 12));
-    for (let i = 0; i <= n; i++) {
-      rect(g, '#121615', i * t - 1, 0, 2, s);
-      rect(g, '#121615', 0, i * t - 1, s, 2);
-    }
+    panels(g, s, rng, 2, [[30, 50, 45], [33, 55, 49]], 'rgba(110,240,190,0.22)', 3);
+    grit(g, s, rng, { noise: 9, stains: 6, cracks: 3 });
   },
-  // scorched canyon stone
+  // verdigris concrete slabs
   sandstone(g, s, rng) {
-    fill(g, s, '#4a3526');
-    const n = 2;
-    const t = s / n;
-    for (let y = 0; y < n; y++)
-      for (let x = 0; x < n; x++) {
-        const v = rng.int(-12, 12);
-        rect(g, `rgb(${84 + v},${60 + v},${42 + v})`, x * t + 1, y * t + 1, t - 2, t - 2);
-      }
-    grit(g, s, rng, { noise: 15, stains: 9, cracks: 4, hatch: 0.25 });
-    for (let i = 0; i <= n; i++) {
-      rect(g, '#150d08', i * t - 1, 0, 2, s);
-      rect(g, '#150d08', 0, i * t - 1, s, 2);
-    }
+    panels(g, s, rng, 2, [[52, 66, 58], [57, 71, 62]], 'rgba(14,22,18,0.8)', 5);
+    grit(g, s, rng, { noise: 12, stains: 8, cracks: 6 });
   },
-  // pitch slate with thin gold seams
+  // obsidian-emerald marble, thin gold inlay
   marble(g, s, rng) {
-    const n = 2;
-    const t = s / n;
-    for (let y = 0; y < n; y++)
-      for (let x = 0; x < n; x++) rect(g, (x + y) % 2 ? '#15151c' : '#1d1c26', x * t, y * t, t, t);
-    grit(g, s, rng, { noise: 7, stains: 4, cracks: 6, hatch: 0.1, scratches: 14 });
-    for (let i = 0; i <= n; i++) {
-      rect(g, '#8a6a2c', i * t, 0, 1, s);
-      rect(g, '#8a6a2c', 0, i * t, s, 1);
+    panels(g, s, rng, 2, [[24, 38, 34], [30, 46, 41]], 'rgba(190,150,70,0.5)', 2);
+    for (let i = 0; i < 5; i++) {
+      g.strokeStyle = `rgba(150,220,190,${rng.range(0.04, 0.09)})`;
+      g.lineWidth = 1;
+      g.beginPath();
+      let x = rng.range(0, s);
+      let y = 0;
+      g.moveTo(x, y);
+      for (let k = 0; k < 6; k++) {
+        x += rng.range(-s * 0.12, s * 0.12);
+        y += s / 6;
+        g.lineTo(x, y);
+      }
+      g.stroke();
     }
+    grit(g, s, rng, { noise: 6, stains: 4, cracks: 0 });
   },
-  // 1998 VR Missions grid
+  // abyssal emerald-black with razor phosphor-mint lines every 2 m
   vrgrid(g, s) {
-    fill(g, s, '#010a0d');
+    fill(g, s, '#020b08');
     const t = s / 2;
-    for (let i = 0; i < 8; i++) {
-      rect(g, 'rgba(40,255,225,0.10)', (i * s) / 8, 0, 1, s);
-      rect(g, 'rgba(40,255,225,0.10)', 0, (i * s) / 8, s, 1);
+    for (let i = 0; i < 4; i++) {
+      rect(g, 'rgba(90,255,190,0.07)', (i * s) / 4, 0, 1, s);
+      rect(g, 'rgba(90,255,190,0.07)', 0, (i * s) / 4, s, 1);
     }
     for (let i = 0; i <= 2; i++) {
-      rect(g, '#0c6a66', i * t - 1, 0, 3, s);
-      rect(g, '#0c6a66', 0, i * t - 1, s, 3);
-      rect(g, '#5cfff0', i * t, 0, 1, s);
-      rect(g, '#5cfff0', 0, i * t, s, 1);
+      rect(g, '#7dffc8', i * t - (i === 2 ? 1 : 0), 0, 1, s);
+      rect(g, '#7dffc8', 0, i * t - (i === 2 ? 1 : 0), s, 1);
     }
   },
 };
 
 // ------------------------------------------------------------------ walls
 // Wall textures span the full wall height (v 0..1) and tile every 2 m along u.
+// Each is a quiet vertical gradient with one accent line and a base band.
+
+function wallBase(g, s, rng, top, bottom, { seam = 'rgba(0,0,0,0.28)', line = null, lineY = 0.3, base = null, baseY = 0.82 } = {}) {
+  shade(g, s, top, bottom);
+  rect(g, seam, 0, 0, 1, s);
+  if (base) {
+    rect(g, base, 0, s * baseY, s, s * (1 - baseY));
+    rect(g, 'rgba(0,0,0,0.35)', 0, s * baseY, s, 1);
+  }
+  if (line) rect(g, line, 0, s * lineY, s, 1);
+  grit(g, s, rng, { noise: 8, stains: 5, cracks: 0 });
+}
 
 const WALLS = {
-  // riveted, rust-streaked hull plating
   hull(g, s, rng) {
-    shade(g, s, '#5d6468', '#33383c');
-    for (let i = 0; i < 2; i++) {
-      rect(g, '#16181a', i * (s / 2), 0, 1, s);
-      rect(g, 'rgba(255,255,255,0.10)', i * (s / 2) + 1, 0, 1, s);
-      for (let y = 6; y < s; y += 12) rect(g, '#1c1f21', i * (s / 2) + 4, y, 2, 2);
-    }
-    rect(g, '#11161c', 0, s * 0.8, s, s * 0.2);
-    rect(g, '#7a5a1e', 0, s * 0.79, s, 2);
-    grit(g, s, rng, { noise: 11, stains: 6, cracks: 1, drips: 9, hatch: 0.2 });
-    for (let i = 0; i < 6; i++) rect(g, 'rgba(120,52,14,0.35)', rng.range(0, s), rng.range(0, s * 0.7), 1, rng.range(6, 30));
+    wallBase(g, s, rng, '#3c5e5a', '#243f3c', { line: 'rgba(214,170,90,0.75)', lineY: 0.8, base: '#182c2b', baseY: 0.81 });
   },
-  // 2AM boardroom: charcoal panels over dark walnut
   officewall(g, s, rng) {
-    shade(g, s, '#2c2e3a', '#1c1d27');
-    for (let i = 0; i < 4; i++) rect(g, '#0e0f15', i * (s / 4), 0, 1, s * 0.6);
-    rect(g, '#2a170d', 0, s * 0.6, s, s * 0.4);
-    for (let k = 0; k < 16; k++) rect(g, 'rgba(0,0,0,0.3)', 0, s * 0.6 + rng.range(0, s * 0.4), s, 1);
-    rect(g, '#7a5a1e', 0, s * 0.6, s, 1);
-    rect(g, '#0a0604', s * 0.06, s * 0.66, s * 0.38, 1);
-    rect(g, '#0a0604', s * 0.56, s * 0.66, s * 0.38, 1);
-    rect(g, '#0a0604', s * 0.06, s * 0.92, s * 0.38, 1);
-    rect(g, '#0a0604', s * 0.56, s * 0.92, s * 0.38, 1);
-    grit(g, s, rng, { noise: 9, stains: 4, cracks: 0, hatch: 0.22, scratches: 8 });
+    wallBase(g, s, rng, '#34494a', '#22332f', { line: 'rgba(120,230,220,0.3)', lineY: 0.22, base: '#182420', baseY: 0.7 });
   },
-  // grimy sub-level concrete with a chewed-up hazard stripe
   labwall(g, s, rng) {
-    shade(g, s, '#4a5450', '#2c3331');
-    for (let i = 0; i < 2; i++) rect(g, '#131716', i * (s / 2), 0, 2, s);
-    rect(g, '#1d6a5a', 0, s * 0.3, s, 2);
-    const y0 = R(s * 0.84);
-    const hh = R(s * 0.09);
-    for (let x = 0; x < s; x++)
-      for (let y = 0; y < hh; y++) {
-        const on = Math.floor((x + y) / 8) % 2 === 0;
-        g.fillStyle = on ? '#b8901c' : '#121212';
-        g.fillRect(x, y0 + y, 1, 1);
-      }
-    rect(g, '#161a19', 0, y0 + hh, s, s);
-    grit(g, s, rng, { noise: 13, stains: 9, cracks: 4, drips: 12, hatch: 0.22 });
-    for (let i = 0; i < 4; i++) rect(g, 'rgba(60,220,150,0.16)', rng.range(0, s), rng.range(s * 0.3, s * 0.8), 1, rng.range(8, 30));
+    wallBase(g, s, rng, '#30504a', '#1d3430', { line: 'rgba(120,255,200,0.6)', lineY: 0.3, base: '#12211e', baseY: 0.86 });
   },
-  // scorched stronghold blockwork
   blocks(g, s, rng) {
-    fill(g, s, '#1a100a');
-    const rows = 5;
-    const rh = s / rows;
-    for (let r = 0; r < rows; r++) {
-      const off = r % 2 ? s / 4 : 0;
-      for (let k = -1; k < 2; k++) {
-        const v = rng.int(-13, 13);
-        rect(g, `rgb(${78 + v},${56 + v},${40 + v})`, k * (s / 2) + off + 1, r * rh + 1, s / 2 - 2, rh - 2);
-        rect(g, 'rgba(255,200,140,0.10)', k * (s / 2) + off + 1, r * rh + 1, s / 2 - 2, 1);
-      }
-    }
-    grit(g, s, rng, { noise: 15, stains: 10, cracks: 5, drips: 5, hatch: 0.28 });
-    shade(g, s, 'rgba(0,0,0,0)', 'rgba(0,0,0,0.45)');
+    wallBase(g, s, rng, '#4a5a4c', '#2c3a32', { base: '#5a3a26', baseY: 0.84 });
+    for (let r = 1; r < 4; r++) rect(g, 'rgba(0,0,0,0.16)', 0, (r * s * 0.84) / 4, s, 1);
   },
-  // noir gallery: slate panels, blood-crimson wainscot, gold pin line
   gallery(g, s, rng) {
-    shade(g, s, '#23222c', '#14131a');
-    for (let y = 0; y < s * 0.66; y += 8)
-      for (let x = (y / 8) % 2 ? 4 : 0; x < s; x += 8) rect(g, 'rgba(180,140,60,0.10)', x, y, 1, 1);
-    rect(g, '#3a0a10', 0, s * 0.68, s, s * 0.32);
-    rect(g, '#8a6a2c', 0, s * 0.68, s, 1);
-    rect(g, '#8a6a2c', 0, s * 0.95, s, 1);
-    for (let i = 0; i < 2; i++) rect(g, '#1c0407', i * (s / 2) + 6, s * 0.74, s / 2 - 12, 1);
-    grit(g, s, rng, { noise: 8, stains: 5, cracks: 1, drips: 3, hatch: 0.25 });
+    wallBase(g, s, rng, '#243631', '#15221f', { line: 'rgba(214,170,90,0.7)', lineY: 0.7, base: '#101a18', baseY: 0.71 });
+    rect(g, 'rgba(150,24,36,0.55)', 0, s * 0.955, s, 2);
   },
   vrwall(g, s) {
-    fill(g, s, '#01090c');
-    for (let i = 0; i <= 4; i++) {
-      rect(g, '#0b4a48', (i * s) / 4, 0, 1, s);
-      rect(g, '#0b4a48', 0, (i * s) / 4, s, 1);
-    }
-    rect(g, '#5cfff0', 0, 0, s, 2);
-    rect(g, '#1fb5a8', 0, s - 3, s, 3);
+    fill(g, s, '#03100c');
+    rect(g, 'rgba(90,255,190,0.16)', 0, 0, 1, s);
+    rect(g, 'rgba(90,255,190,0.16)', 0, s / 2, s, 1);
+    rect(g, '#7dffc8', 0, 0, s, 1);
+    rect(g, '#2fa87a', 0, s - 2, s, 2);
   },
 };
 
@@ -391,7 +336,7 @@ const MISC = {
 };
 
 export function floorTexture(name) {
-  return make(`floor:${name}`, 128, FLOORS[name]);
+  return make(`floor:${name}`, 256, FLOORS[name]);
 }
 export function wallTexture(name) {
   return make(`wall:${name}`, 128, WALLS[name]);
