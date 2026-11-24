@@ -46,7 +46,7 @@ test('every target rolls a valid mission, deterministically, with every verb in 
       cats.set(m.category, (cats.get(m.category) || 0) + 1);
     }
   assert.equal(verbs.size, 12, 'all twelve verbs turn up');
-  for (const [c, n] of cats) assert.ok(n > 1800 * 0.2, `${c} is too rare: ${n}`);
+  for (const [c, n] of cats) assert.ok(n > THEME_IDS.length * 300 * 0.2, `${c} is too rare: ${n}`);
 });
 
 test('objects lean towards jobs that suit them', () => {
@@ -63,8 +63,8 @@ test('objects lean towards jobs that suit them', () => {
 
 test('rooms carry their mission, and difficulty never changes it', () => {
   for (let i = 0; i < 18; i++) {
-    const a = generateRoom({ seed: `mroom-${i}`, level: 1 + (i % 4), theme: THEME_IDS[i % 6] });
-    const b = generateRoom({ seed: `mroom-${i}`, level: 1 + (i % 4), theme: THEME_IDS[i % 6], mods: resolveMods({ difficulty: 'master' }) });
+    const a = generateRoom({ seed: `mroom-${i}`, level: 1 + (i % 4), theme: THEME_IDS[i % THEME_IDS.length] });
+    const b = generateRoom({ seed: `mroom-${i}`, level: 1 + (i % 4), theme: THEME_IDS[i % THEME_IDS.length], mods: resolveMods({ difficulty: 'master' }) });
     assert.ok(a.loot.info.mission.verb);
     assert.deepEqual(a.loot.info.mission, b.loot.info.mission);
     assert.equal(a.loot.info.name, b.loot.info.name);
@@ -95,7 +95,7 @@ test('Room 1 always has ductwork, on every difficulty and in every setting', () 
         assert.ok(ductPath(r, r.vents[0]).length >= 1, 'the duct spans at least the wall it passes through');
         n++;
       }
-  assert.equal(n, 240);
+  assert.equal(n, PRESET_IDS.length * THEME_IDS.length * 10);
 });
 
 test('every vent has a duct: axis-aligned, grate to grate, Manhattan length', () => {

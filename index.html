@@ -57,9 +57,10 @@
         <p class="tagline caption">No weapons. No alarms. Just you, the ductwork, and a very silly assignment.</p>
         <div class="menu">
           <button id="btn-start" class="btn primary">START MISSION</button>
+          <button id="btn-infinite" class="btn infinite"><span>ENDLESS RUN <i>∞</i></span><small id="infinite-line">RANDOM PROCEDURAL LEVELS · NEVER RUNS OUT</small><small id="infinite-pill" class="cf-pill hidden"></small></button>
           <button id="btn-vault" class="btn">CASE FILES</button>
           <button id="btn-setup" class="btn setup-btn"><span>MISSION SETUP</span><small id="setup-line">OPERATIVE · CLASSIC · COMPACT</small></button>
-          <div class="row tiny"><span>ALL-AGES STEALTH</span><span id="seed-line"></span></div>
+          <div class="row tiny seed-row"><span>ALL-AGES STEALTH</span><span class="seed-box"><span id="seed-line"></span><button id="btn-reroll" class="reroll" title="Roll a fresh random seed" aria-label="New seed: roll a fresh random seed">🎲 NEW SEED</button></span></div>
         </div>
       </div>
     </section>
@@ -70,6 +71,7 @@
         <h2>Meanwhile, in the shadows…</h2>
         <button id="btn-resume" class="btn primary">RESUME</button>
         <button id="btn-restart" class="btn">RESTART ROOM</button>
+        <button id="btn-reroll-pause" class="btn setup-btn infinite-only"><span>NEW SEED / REROLL</span><small>FRESH ENDLESS RUN · STREAK RESETS</small></button>
         <button id="btn-setup2" class="btn setup-btn"><span>MISSION SETUP</span><small id="setup-line2"></small></button>
         <button id="btn-style" class="btn">VISUAL STYLE: COMIC PRINT</button>
         <button id="btn-mute" class="btn">SOUND: ON</button>
@@ -112,6 +114,7 @@
         </div>
         <div id="badges"></div>
         <button id="btn-next" class="btn primary">NEXT ISSUE <kbd>Space</kbd></button>
+        <button id="btn-reroll-clear" class="btn setup-btn infinite-only"><span>NEW SEED / REROLL</span><small>JUMP TO A FRESH SEED · KEEP YOUR STREAK</small></button>
         <button id="btn-clear-quit" class="btn ghost small">bank it &amp; quit</button>
       </div>
     </section>
@@ -121,6 +124,8 @@
         <div class="panel-head">CASE FILES</div>
         <h2 id="vault-count">0 case files closed</h2>
         <div id="vault-stats"></div>
+        <div class="mini-head"><span class="lbl">CASE DOSSIERS · BY MODE</span><button id="vault-all-modes" class="chip pill sel">ALL MODES</button></div>
+        <div id="vault-modes" class="mini-files"></div>
         <div id="vault-filters" class="chips"></div>
         <div id="vault-list"></div>
         <button id="btn-vault-back" class="btn primary">BACK</button>

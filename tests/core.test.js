@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { RNG, hashSeed } from '../src/core/rng.js';
 import { castRay, hasLineOfSight, findPath } from '../src/core/grid.js';
 import { buildTimeline, poseAt, angDiff, TURN_SPEED } from '../src/core/patrol.js';
-import { canSee, canChoke, inCone, detectRate, isBumping, rankFor, CHOKE_RANGE, CHOKE_REAR_ARC, DEFAULT_VISION } from '../src/core/stealth.js';
+import { canSee, canChoke, inCone, detectRate, isBumping, rankFor, CHOKE_RANGE, CHOKE_REAR_ARC, DEFAULT_VISION, CALLOUT_RADIUS, guardsInEarshot, effectiveVision } from '../src/core/stealth.js';
 import { LOOT } from '../src/core/loot.js';
 import { THEME_IDS, THEMES } from '../src/core/themes.js';
 import { roomFromAscii } from './helpers.js';
@@ -197,9 +197,27 @@ test('loot: 24+ unique items, every theme has locals', () => {
   assert.equal(new Set(LOOT.map((l) => l.id)).size, LOOT.length);
   assert.equal(new Set(LOOT.map((l) => l.name)).size, LOOT.length);
   assert.equal(new Set(LOOT.map((l) => l.prop)).size, LOOT.length, 'every item has a distinct prop');
-  assert.equal(THEME_IDS.length, 6);
+  assert.equal(THEME_IDS.length, 10);
   for (const id of THEME_IDS) {
     assert.ok(LOOT.some((l) => l.themes && l.themes.includes(id)), `no loot for ${id}`);
     assert.ok(THEMES[id].covers.length > 0);
   }
+});
+
+test('guardsInEarshot alerts nearby awake colleagues and skips caller, asleep, held, and distant guards', () => {
+  const caller = { state: 'suspicious', pose: { x: 5, z: 5 } };
+  const nearPatrol = { state: 'patrol', pose: { x: 5 + CALLOUT_RADIUS - 1, z: 5 } };
+  const nearLook = { state: 'look', pose: { x: 5, z: 5 + 3 } };
+  const nearAsleep = { state: 'asleep', pose: { x: 6, z: 5 } };
+  const nearHeld = { state: 'held', pose: { x: 5, z: 6 } };
+  const farPatrol = { state: 'patrol', pose: { x: 5 + CALLOUT_RADIUS + 2, z: 5 } };
+  const heard = guardsInEarshot([caller, nearPatrol, nearLook, nearAsleep, nearHeld, farPatrol], caller);
+  assert.deepEqual(heard, [nearPatrol, nearLook]);
+});
+
+test('effectiveVision widens and extends cone when heightened', () => {
+  assert.equal(effectiveVision(DEFAULT_VISION, false), DEFAULT_VISION);
+  const boosted = effectiveVision(DEFAULT_VISION, true);
+  assert.ok(boosted.range > DEFAULT_VISION.range);
+  assert.ok(boosted.half > DEFAULT_VISION.half);
 });

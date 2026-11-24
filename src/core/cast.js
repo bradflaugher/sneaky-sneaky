@@ -127,6 +127,46 @@ export const THEME_CAST = {
       [0x0c1630, 0x0a1026, 0xff3ac8],
     ],
   },
+  // Velvet tuxedos, burgundy waistcoats, gold piping.
+  casino: {
+    weights: { gala: 5, enforcer: 3, watchman: 1, tech: 1, tactical: 0 },
+    uniforms: [
+      [0x5a1226, 0x14121a, 0xe8b93a],
+      [0x16141c, 0x16141c, 0xc0283a],
+      [0x7a1f2a, 0x1a1420, 0xf0d890],
+      [0x1e3a34, 0x14121a, 0xe8b93a],
+    ],
+  },
+  // Olive field coats, moss aprons, brass buttons.
+  greenhouse: {
+    weights: { watchman: 5, tech: 3, gala: 2, enforcer: 1, tactical: 0 },
+    uniforms: [
+      [0x5a6a34, 0x2e3422, 0xd0a040],
+      [0x2f5a44, 0x1e2a24, 0xe8d8a8],
+      [0x8a7a4a, 0x34402a, 0x4fc89a],
+      [0x3a4a2a, 0x23281c, 0xe07a3a],
+    ],
+  },
+  // Navy and scarlet parkas, cream knitwear.
+  alpine: {
+    weights: { tactical: 4, enforcer: 3, watchman: 3, gala: 1, tech: 0 },
+    uniforms: [
+      [0x1e2f5a, 0x16203a, 0xd8302a],
+      [0xc8302a, 0x1a2238, 0xf2ead8],
+      [0xf0e8d6, 0x1e2f5a, 0xd8302a],
+      [0x2a4a6a, 0x1a2238, 0xf0c040],
+    ],
+  },
+  // Charcoal transit blazers, slate overalls, safety-amber trim.
+  subway: {
+    weights: { watchman: 5, tactical: 3, tech: 2, enforcer: 2, gala: 0 },
+    uniforms: [
+      [0x2e3038, 0x1c1e24, 0xffa820],
+      [0x4a5866, 0x23282e, 0xffa820],
+      [0xffa820, 0x2e3038, 0x3ad8e8],
+      [0x3a4450, 0x1c1e24, 0xe8e4d8],
+    ],
+  },
 };
 
 export const SKIN_TONES = [0xf3cfb0, 0xe2b089, 0xc98f62, 0xa56f45, 0x7c5030, 0x55351f];

@@ -12,17 +12,23 @@ const el = (tag, cls, text) => {
 };
 
 export class SetupPanel {
-  constructor(onChange, onClick) {
+  /** `getDossiers` returns modeCaseFiles(save), for the mini case-file pill on each difficulty. */
+  constructor(onChange, onClick, getDossiers) {
     this.onChange = onChange;
     this.onClick = onClick || (() => {});
+    this.getDossiers = getDossiers || (() => []);
     this.root = document.getElementById('setup-fields');
     this.note = document.getElementById('setup-note');
     this.setup = normalizeSetup();
   }
 
-  open(setup, midRun) {
+  open(setup, midRun, infinite = false) {
     this.setup = normalizeSetup(setup);
-    this.note.textContent = midRun ? 'Changes take effect from the next room. Starting size applies to your next run.' : '';
+    this.note.textContent = infinite
+      ? 'Endless Run rolls its own setting, floor plan and size every room, with Operative guards. These settings apply to START MISSION.'
+      : midRun
+        ? 'Changes take effect from the next room. Starting size applies to your next run.'
+        : '';
     this.note.classList.toggle('hidden', !midRun);
     this.render();
   }
@@ -46,9 +52,10 @@ export class SetupPanel {
       return row;
     };
     const chips = (row, key, options) => {
-      for (const [value, label, tag] of options) {
+      for (const [value, label, tag, pill] of options) {
         const b = el('button', `chip${s[key] === value ? ' sel' : ''}`, label);
         if (tag) b.append(el('small', '', tag));
+        if (pill) b.append(el('small', 'cf-pill', pill)); // mini case file: "3 cleared · Best S"
         b.addEventListener('click', () => {
           this.onClick();
           this.set(key, value);
@@ -59,7 +66,8 @@ export class SetupPanel {
     };
 
     const p = PRESETS[s.difficulty];
-    chips(field('DIFFICULTY', p.blurb), 'difficulty', Object.values(PRESETS).map((x) => [x.id, x.name, x.tag]));
+    const dossier = Object.fromEntries(this.getDossiers().map((d) => [d.id, d.summary]));
+    chips(field('DIFFICULTY', p.blurb), 'difficulty', Object.values(PRESETS).map((x) => [x.id, x.name, x.tag, dossier[x.id]]));
     chips(field('RAMP PACE', RAMPS[s.ramp].blurb), 'ramp', Object.values(RAMPS).map((x) => [x.id, x.name]));
     chips(field('STARTING SIZE', this.forecast()), 'start', Object.values(STARTS).map((x) => [x.id, x.name, x.tier === 1 ? 'Room 1' : `Tier ${x.tier}`]));
     chips(field('SETTING', s.theme === 'random' ? 'A new setting every room.' : `Every room: ${THEMES[s.theme]?.place || ''}.`), 'theme', [['random', 'Endless Shuffle'], ...Object.values(THEMES).map((t) => [t.id, t.name])]);

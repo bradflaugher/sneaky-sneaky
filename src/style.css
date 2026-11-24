@@ -691,6 +691,104 @@ h1 i {
   color: var(--blue);
 }
 
+/* ---- infinite play: its own cyan cover button, the seed roller, case-file pills */
+.btn.infinite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--dots), var(--cyan);
+  box-shadow: 5px 5px 0 var(--ink);
+  font-size: 23px;
+}
+.btn.infinite i {
+  font-style: normal;
+  display: inline-block;
+  color: var(--paper);
+  text-shadow: 2px 2px 0 var(--ink);
+  transform: translateY(0.04em) scale(1.25);
+  margin-left: 0.12em;
+}
+.btn.infinite small {
+  font: 700 10.5px var(--body);
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+.btn.infinite:hover,
+.btn.infinite:focus-visible {
+  background: var(--dots), var(--yellow);
+}
+/* the mode a shared link (or the last run) chose: Enter starts this one */
+.btn.infinite.preferred {
+  box-shadow: 7px 7px 0 var(--ink);
+  outline: 2.5px solid var(--yellow);
+  outline-offset: 2px;
+}
+.cf-pill {
+  display: inline-block;
+  align-self: center;
+  margin-top: 3px;
+  padding: 1px 8px 0;
+  background: var(--ink);
+  color: var(--yellow) !important;
+  border-radius: 999px;
+  font: 700 10px/1.5 var(--body) !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  opacity: 1 !important;
+  white-space: nowrap;
+}
+.setup .chip .cf-pill {
+  display: table;
+  margin: 3px auto 2px;
+}
+.seed-row {
+  align-items: center;
+  gap: 8px;
+}
+.seed-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+#seed-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#seed-line.rolled {
+  animation: slam 0.3s cubic-bezier(0.2, 2.1, 0.4, 1);
+  color: var(--yellow);
+}
+.reroll {
+  flex: none;
+  cursor: pointer;
+  padding: 3px 8px 2px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  font: 700 10.5px var(--body);
+  letter-spacing: 0.1em;
+  text-shadow: none;
+}
+.reroll:hover,
+.reroll:focus-visible {
+  background: var(--yellow);
+  outline: none;
+}
+.reroll:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+.infinite-only {
+  display: none;
+}
+.mode-infinite .infinite-only {
+  display: flex;
+}
+
 /* ---- bursts */
 .burst-wrap {
   filter: drop-shadow(6px 6px 0 var(--ink));
@@ -873,12 +971,187 @@ h1 i {
   font: 700 12px var(--body);
   color: var(--dim);
 }
+/* mini case files: one manila dossier folder per game type */
+.mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+.mini-head .lbl {
+  font: 700 11px var(--body);
+  letter-spacing: 0.16em;
+  color: var(--dim);
+}
+.chip.pill {
+  flex: none;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 3px 11px 1px;
+}
+.mini-files {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 6px 4px 2px;
+  flex: none;
+}
+.mini-file {
+  --folder: #e8cf8e;
+  position: relative;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 5px;
+  min-width: 0;
+  padding: 9px 8px 6px;
+  border: 2px solid var(--ink);
+  border-radius: 0 5px 3px 3px;
+  background: var(--dots), var(--folder);
+  color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  text-align: left;
+  font: 700 10px/1.25 var(--body);
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+.mini-file.mode-tourist {
+  --folder: #cfe6b8;
+}
+.mini-file.mode-operative {
+  --folder: #e8cf8e;
+}
+.mini-file.mode-shadow {
+  --folder: #c9c3e6;
+}
+.mini-file.mode-master {
+  --folder: #f0b0a4;
+}
+.mini-file.mode-infinite {
+  --folder: #a6e2ea;
+}
+/* the folder tab */
+.mini-file .tab {
+  position: absolute;
+  left: -2px;
+  top: -11px;
+  max-width: calc(100% - 8px);
+  padding: 1px 7px 0;
+  border: 2px solid var(--ink);
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  background: var(--folder);
+  font: 700 9.5px/1.35 var(--body);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-file b {
+  font: 400 27px/1 var(--display);
+  letter-spacing: 0.03em;
+}
+.mini-file .unit {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  padding-right: 28px;
+}
+.mini-file .facts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px 7px;
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1.5px dashed rgba(11, 13, 18, 0.45);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+/* the best-rank stamp, inked on at an angle */
+.mini-file .stamp {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--dim);
+  font: 400 18px/1 var(--display);
+  transform: rotate(9deg);
+}
+.mini-file .stamp.S {
+  background: var(--yellow);
+  color: var(--ink);
+}
+.mini-file .stamp.A {
+  background: var(--cyan);
+  color: var(--ink);
+}
+.mini-file .stamp.B {
+  background: var(--paper);
+  color: var(--ink);
+}
+.mini-file.unopened {
+  background: var(--folder);
+  filter: saturate(0.55);
+}
+.mini-file.unopened b,
+.mini-file.unopened .unit,
+.mini-file.unopened .facts {
+  opacity: 0.6;
+}
+.mini-file:hover,
+.mini-file:focus-visible {
+  transform: translate(-1px, -2px) rotate(-1deg);
+  box-shadow: 4px 5px 0 var(--ink);
+  outline: none;
+  filter: none;
+}
+.mini-file.sel {
+  transform: translate(-1px, -3px) rotate(-2deg);
+  box-shadow: 5px 6px 0 var(--ink);
+  outline: 2.5px solid var(--red);
+  outline-offset: 1px;
+  filter: none;
+}
+.vault-item .modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.mode-tag {
+  padding: 0 5px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: #e8cf8e;
+  font: 700 8.5px/1.5 var(--body);
+  letter-spacing: 0.08em;
+}
+.mode-tag.mode-tourist {
+  background: #cfe6b8;
+}
+.mode-tag.mode-shadow {
+  background: #c9c3e6;
+}
+.mode-tag.mode-master {
+  background: #f0b0a4;
+}
+.mode-tag.mode-infinite {
+  background: #a6e2ea;
+}
 #vault-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
   overflow: auto;
-  max-height: 48dvh;
+  max-height: 40dvh;
   min-height: 0;
   padding: 2px 8px 8px 2px;
   touch-action: pan-y;
@@ -943,6 +1216,64 @@ h1 i {
   color: var(--dim);
   padding: 18px 4px;
   font-size: 13px;
+}
+/* playable catalog cases: OPEN / CLOSED stamp up top, PLAY CASE pinned to the bottom */
+.vault-item.case-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.vault-item.case-card > * {
+  flex: none;
+}
+.vault-item.case-card > .play-case {
+  margin-top: auto;
+}
+.vault-item.case-card > :nth-last-child(2) {
+  margin-bottom: 9px;
+}
+.vault-item .case-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+}
+.vault-item .case-stamp {
+  font: 400 10px var(--display);
+  letter-spacing: 0.12em;
+  padding: 1px 6px 0;
+  border: 2px dashed var(--ink);
+  transform: rotate(2deg);
+  white-space: nowrap;
+}
+.vault-item .case-stamp.open {
+  background: var(--paper);
+}
+.vault-item .case-stamp.closed {
+  border-style: solid;
+  background: var(--ink);
+  color: var(--yellow);
+}
+.vault-item .meta.where {
+  color: var(--ink);
+  margin-top: 2px;
+}
+.vault-item .play-case {
+  align-self: stretch;
+  background: var(--yellow);
+  font-size: 15px;
+  padding: 6px 10px 4px;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+.vault-item .play-case.replay {
+  background: #fffaf0;
+}
+.vault-item .play-case:hover,
+.vault-item .play-case:focus-visible {
+  background: var(--cyan);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
 }
 #vault-list .more {
   grid-column: 1 / -1;
@@ -1180,6 +1511,26 @@ kbd {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .btn.infinite {
+    font-size: 21px;
+  }
+}
+/* narrow panels: the five folders become a strip you swipe along */
+@media (max-width: 620px) {
+  .mini-files {
+    grid-template-columns: repeat(5, minmax(118px, 1fr));
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+    padding-right: 10px;
+  }
+  .mini-file {
+    scroll-snap-align: start;
+  }
+  .mini-head .lbl {
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+  }
 }
 @media (max-height: 460px) {
   h1 {
@@ -1199,9 +1550,43 @@ kbd {
   .tagline {
     display: none;
   }
+  /* short landscape phones: the cover menu goes two-up so nothing scrolls */
   .menu {
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
     margin-top: 12px;
+  }
+  .menu .seed-row {
+    grid-column: 1 / -1;
+  }
+  .menu .btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn.infinite,
+  .btn.infinite.preferred {
+    font-size: 19px;
+    box-shadow: var(--drop);
+  }
+  #infinite-line {
+    display: none;
+  }
+  .cover {
+    width: min(520px, 100%);
+  }
+  .mini-files {
+    padding-top: 11px;
+    gap: 8px;
+  }
+  .mini-file b {
+    font-size: 20px;
+  }
+  #vault-list {
+    max-height: none;
+    overflow: visible;
   }
   .btn {
     padding: 6px 14px 4px;

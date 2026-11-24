@@ -1,9 +1,21 @@
 // Procedural heist rooms.
 //
-// Layout: a BSP of chambers separated by 1-cell walls, joined by 2-cell
+// Layout: rectangular chambers separated by 1-cell walls, joined by 2-cell
 // doorways (a spanning tree plus the odd extra), dressed with waist-high cover,
 // crawl vents, laser doors with wall switches, a loot pedestal and an
 // extraction pad. Guards get loop / ping-pong / lookout patrols.
+//
+// How the chambers are carved is the room's architectural style
+// (`room.layoutStyle`, rolled from the seed):
+//
+//   classic   a BSP split of the whole footprint
+//   atrium    a generous central grand hall ringed by perimeter chambers
+//   wing      an L-shaped or stepped footprint: one or two outer corners are
+//             solid mass (`room.voids`), so the plan is not a plain rectangle
+//   corridor  a central spine corridor with flanking chambers, every one
+//             opening onto it, and HVAC ducts crossing over the corridor
+//
+// A style that cannot fit its footprint falls back to classic.
 //
 // Every room returned has been through both verifiers in solver.js, so it is
 // guaranteed beatable as a perfect ghost: no knockouts, no distractions.
@@ -30,6 +42,15 @@ const COVER_SHAPES = [
 ];
 
 export const MAX_SIZE_TIER = 20;
+
+/** Architectural layout styles, and how often each is rolled. */
+export const LAYOUT_STYLES = ['classic', 'atrium', 'wing', 'corridor'];
+const LAYOUT_WEIGHTS = { classic: 3, atrium: 2, wing: 2, corridor: 2 };
+
+/** The layout style a seed rolls at a tier. Independent of theme and difficulty. */
+export function layoutStyleFor(seed, level = 1) {
+  return new RNG(hashSeed(`${seed}|layout|${level}`)).weighted(LAYOUT_STYLES, (s) => LAYOUT_WEIGHTS[s]);
+}
 const NO_MODS = { vision: 1, speed: 1, density: 1, puzzleShift: 0, sizeShift: 0 };
 
 export function guardCountFor(level, density = 1) {
@@ -38,21 +59,38 @@ export function guardCountFor(level, density = 1) {
 }
 
 /**
- * generateRoom({ seed, level, theme, mods }) -> room
+ * The mission target and the address a (seed, tier, setting) rolls. They come
+ * from their own stream, so they depend only on those three, never on layout
+ * retries, layout style or difficulty. Cheap: the case catalog calls this at
+ * boot without generating a single room.
+ */
+export function rollFlavour(seed, level, themeId) {
+  const flavour = new RNG(hashSeed(`${seed}|loot|${level}|${themeId}`));
+  const loot = generateLoot(flavour, themeId);
+  return { loot, venue: venueName(themeId, flavour) };
+}
+
+/**
+ * generateRoom({ seed, level, theme, mods, layout, lootOverride, venueOverride }) -> room
  * `theme` is optional; omitted, one is rolled from the seed.
+ * `layout` is optional too: one of LAYOUT_STYLES, else rolled from the seed.
+ * `room.layoutStyle` records the style actually built.
  * `mods` (see core/difficulty.js resolveMods) scales guard vision, patrol
  * speed, guard density, how early puzzles appear and how big compounds get.
  * `level` is the size/complexity tier: 1 is a three-chamber starter, 14+ is a
  * sprawling mega-facility. It keeps working past MAX_SIZE_TIER (rooms simply
  * stop growing), so an endless run never runs out of rooms.
+ * `lootOverride` / `venueOverride` pin the exact mission target and address
+ * (a Case File from core/caseCatalog.js) instead of rolling them.
  */
-export function generateRoom({ seed, level = 1, theme = null, mods = null }) {
+export function generateRoom({ seed, level = 1, theme = null, mods = null, layout = null, lootOverride = null, venueOverride = null }) {
   const m = { ...NO_MODS, ...(mods || {}) };
   const themeRng = new RNG(hashSeed(`${seed}|theme|${level}`));
   const themeId = theme && THEMES[theme] ? theme : themeRng.pick(THEME_IDS);
+  const style = LAYOUT_STYLES.includes(layout) ? layout : layoutStyleFor(seed, level);
   for (let attempt = 0; attempt < 60; attempt++) {
     const rng = new RNG(hashSeed(`${seed}|${level}|${attempt}`));
-    const room = buildLayout(rng, level, m);
+    const room = buildLayout(rng, level, m, style);
     if (!room) continue;
     const topo = solveTopology(room);
     if (!topo.ok) continue;
@@ -63,12 +101,10 @@ export function generateRoom({ seed, level = 1, theme = null, mods = null }) {
     room.attempt = attempt;
     const coverKinds = THEMES[themeId].covers;
     for (const c of room.covers) if (c.kind !== 'pedestal') c.kind = rng.pick(coverKinds);
-    // The target and the address are rolled from their own stream, so they
-    // depend only on the seed and theme, never on layout retries.
-    const flavour = new RNG(hashSeed(`${seed}|loot|${level}|${themeId}`));
-    room.loot.info = generateLoot(flavour, themeId);
+    const flavour = lootOverride && venueOverride ? null : rollFlavour(seed, level, themeId);
+    room.loot.info = lootOverride || flavour.loot;
     room.loot.item = room.loot.info.id;
-    room.venue = venueName(themeId, flavour);
+    room.venue = venueOverride || flavour.venue;
     if (!placeGuards(room, rng, level, m)) continue;
     return room;
   }
@@ -77,7 +113,126 @@ export function generateRoom({ seed, level = 1, theme = null, mods = null }) {
 
 // ---------------------------------------------------------------- layout
 
-function buildLayout(rng, level, m) {
+/**
+ * Split the largest splittable leaves (never a `fixed` one) until there are
+ * `target` of them, and then for as long as one is at least `maxArea` cells.
+ */
+function splitLeaves(leaves, target, rng, maxArea = Infinity) {
+  for (;;) {
+    const splittable = leaves.filter((l) => !l.fixed && (l.w >= MIN_CHAMBER * 2 + 1 || l.h >= MIN_CHAMBER * 2 + 1));
+    if (!splittable.length) break;
+    splittable.sort((a, b) => b.w * b.h - a.w * a.h);
+    const leaf = splittable[0];
+    if (leaves.length >= target && leaf.w * leaf.h < maxArea) break;
+    const canV = leaf.w >= MIN_CHAMBER * 2 + 1;
+    const canH = leaf.h >= MIN_CHAMBER * 2 + 1;
+    const vertical = canV && canH ? (leaf.w > leaf.h * 1.25 ? true : leaf.h > leaf.w * 1.25 ? false : rng.chance(0.5)) : canV;
+    leaves.splice(leaves.indexOf(leaf), 1);
+    if (vertical) {
+      const p = rng.int(leaf.x + MIN_CHAMBER, leaf.x + leaf.w - MIN_CHAMBER - 1);
+      leaves.push({ ...leaf, w: p - leaf.x });
+      leaves.push({ ...leaf, x: p + 1, w: leaf.x + leaf.w - p - 1 });
+    } else {
+      const p = rng.int(leaf.y + MIN_CHAMBER, leaf.y + leaf.h - MIN_CHAMBER - 1);
+      leaves.push({ ...leaf, h: p - leaf.y });
+      leaves.push({ ...leaf, y: p + 1, h: leaf.y + leaf.h - p - 1 });
+    }
+  }
+  return leaves;
+}
+
+// Each style returns { leaves, voids } for a w x h grid, or null when the
+// footprint is too small for it. Leaves are floor rectangles that tile the
+// footprint with exactly one wall cell between neighbours; `role` tags the
+// ones the rest of the generator treats specially.
+const LAYOUTS = {
+  classic(rng, w, h, target) {
+    return { leaves: splitLeaves([{ x: 1, y: 1, w: w - 2, h: h - 2 }], target, rng), voids: [] };
+  },
+
+  // A grand hall in the middle. Small footprints get a hall running the full
+  // depth between two flanks; big ones get chambers all the way round it.
+  atrium(rng, w, h, target) {
+    const iw = w - 2;
+    const ih = h - 2;
+    if (iw < MIN_CHAMBER * 2 + 9) return null;
+    const hw = Math.max(7, Math.min(iw - (MIN_CHAMBER + 1) * 2, Math.round(iw * rng.range(0.34, 0.44))));
+    const spare = iw - hw - 2 - MIN_CHAMBER * 2;
+    const lw = MIN_CHAMBER + Math.floor(spare / 2) + (spare > 1 ? rng.int(-1, 1) : 0);
+    const rw = iw - hw - 2 - lw;
+    const hx = 1 + lw + 1;
+    const ring = ih >= MIN_CHAMBER * 2 + 11;
+    if (!ring) {
+      const leaves = [
+        { x: 1, y: 1, w: lw, h: ih, role: 'flank' },
+        { x: hx, y: 1, w: hw, h: ih, role: 'hall', fixed: true },
+        { x: hx + hw + 1, y: 1, w: rw, h: ih, role: 'flank' },
+      ];
+      return { leaves: splitLeaves(leaves, target, rng, hw * ih), voids: [] };
+    }
+    const hh = Math.max(9, Math.min(ih - (MIN_CHAMBER + 1) * 2, Math.round(ih * rng.range(0.4, 0.5))));
+    const spareV = ih - hh - 2 - MIN_CHAMBER * 2;
+    const th = MIN_CHAMBER + Math.floor(spareV / 2) + (spareV > 1 ? rng.int(-1, 1) : 0);
+    const bh = ih - hh - 2 - th;
+    const hy = 1 + th + 1;
+    const leaves = [
+      { x: 1, y: 1, w: iw, h: th, role: 'flank' },
+      { x: 1, y: hy, w: lw, h: hh, role: 'flank' },
+      { x: hx, y: hy, w: hw, h: hh, role: 'hall', fixed: true },
+      { x: hx + hw + 1, y: hy, w: rw, h: hh, role: 'flank' },
+      { x: 1, y: hy + hh + 1, w: iw, h: bh, role: 'flank' },
+    ];
+    // nothing round the hall is allowed to out-size it
+    return { leaves: splitLeaves(leaves, Math.max(target, 5), rng, hw * hh), voids: [] };
+  },
+
+  // Two bands, one or both cut short by a block of solid mass in an outer
+  // corner: an L, or on wide footprints a stepped S / Z.
+  wing(rng, w, h, target) {
+    const iw = w - 2;
+    const ih = h - 2;
+    if (iw < MIN_CHAMBER * 2 + 2 || ih < MIN_CHAMBER * 2 + 1) return null;
+    const cutTop = rng.chance(0.5);
+    const cutLeft = rng.chance(0.5);
+    const cutH = rng.int(MIN_CHAMBER, ih - MIN_CHAMBER - 1); // depth of the shortened band
+    const cutW = rng.int(Math.max(MIN_CHAMBER, Math.round(iw * 0.26)), Math.min(iw - MIN_CHAMBER - 1, Math.round(iw * 0.5)));
+    const fullH = ih - cutH - 1;
+    const yCut = cutTop ? 1 : 1 + fullH + 1;
+    const yFull = cutTop ? 1 + cutH + 1 : 1;
+    const short = { x: cutLeft ? 1 + cutW : 1, y: yCut, w: iw - cutW, h: cutH, role: 'wing' };
+    const full = { x: 1, y: yFull, w: iw, h: fullH, role: 'wing' };
+    const voids = [{ x: cutLeft ? 1 : 1 + iw - cutW, y: yCut, w: cutW, h: cutH }];
+    // the second step, in the opposite corner of the other band
+    if (iw >= 26 && fullH >= MIN_CHAMBER && rng.chance(0.55)) {
+      const stepW = rng.int(MIN_CHAMBER, Math.max(MIN_CHAMBER, Math.min(Math.round(iw * 0.3), iw - cutW - 8)));
+      if (iw - cutW - stepW >= 8) {
+        voids.push({ x: cutLeft ? 1 + iw - stepW : 1, y: yFull, w: stepW, h: fullH });
+        full.w = iw - stepW;
+        if (!cutLeft) full.x = 1 + stepW;
+      }
+    }
+    return { leaves: splitLeaves([short, full], target, rng), voids };
+  },
+
+  // A corridor down the middle with chambers off both sides.
+  corridor(rng, w, h, target) {
+    const iw = w - 2;
+    const ih = h - 2;
+    const sh = ih >= 15 ? 3 : 2;
+    const rest = ih - sh - 2; // floor rows left for the two flanks
+    if (rest < 8 || iw < MIN_CHAMBER * 2 + 1) return null;
+    // the spine stays near the middle: it may drift a little, never to an edge
+    const nh = rest < MIN_CHAMBER * 2 ? Math.floor(rest / 2) + (rest % 2 ? rng.int(0, 1) : 0) : Math.max(MIN_CHAMBER, Math.min(rest - MIN_CHAMBER, Math.round(rest * rng.range(0.38, 0.62))));
+    const leaves = [
+      { x: 1, y: 1, w: iw, h: nh, role: 'north' },
+      { x: 1, y: 1 + nh + 1, w: iw, h: sh, role: 'spine', fixed: true },
+      { x: 1, y: 1 + nh + 1 + sh + 1, w: iw, h: rest - nh, role: 'south' },
+    ];
+    return { leaves: splitLeaves(leaves, Math.max(target, 4) + 1, rng), voids: [] };
+  },
+};
+
+function buildLayout(rng, level, m, style = 'classic') {
   // lv drives physical size and chamber count; plv drives puzzle density.
   const lv = Math.max(1, Math.min(level + m.sizeShift, MAX_SIZE_TIER));
   const plv = Math.max(1, level + m.puzzleShift);
@@ -88,6 +243,8 @@ function buildLayout(rng, level, m) {
     w,
     h,
     cells,
+    layoutStyle: style,
+    voids: [],
     chambers: [],
     doors: [],
     covers: [],
@@ -97,28 +254,15 @@ function buildLayout(rng, level, m) {
     guards: [],
   };
 
-  // --- BSP chambers
+  // --- chambers, carved in the room's architectural style
   const target = lv <= 1 ? 3 : lv <= 2 ? rng.int(3, 4) : lv <= 4 ? rng.int(4, 5) : Math.min(15, rng.int(5, 7) + Math.floor((lv - 5) * 0.6));
-  const leaves = [{ x: 1, y: 1, w: w - 2, h: h - 2 }];
-  while (leaves.length < target) {
-    const splittable = leaves.filter((l) => l.w >= MIN_CHAMBER * 2 + 1 || l.h >= MIN_CHAMBER * 2 + 1);
-    if (!splittable.length) break;
-    splittable.sort((a, b) => b.w * b.h - a.w * a.h);
-    const leaf = splittable[0];
-    const canV = leaf.w >= MIN_CHAMBER * 2 + 1;
-    const canH = leaf.h >= MIN_CHAMBER * 2 + 1;
-    const vertical = canV && canH ? (leaf.w > leaf.h * 1.25 ? true : leaf.h > leaf.w * 1.25 ? false : rng.chance(0.5)) : canV;
-    leaves.splice(leaves.indexOf(leaf), 1);
-    if (vertical) {
-      const p = rng.int(leaf.x + MIN_CHAMBER, leaf.x + leaf.w - MIN_CHAMBER - 1);
-      leaves.push({ x: leaf.x, y: leaf.y, w: p - leaf.x, h: leaf.h });
-      leaves.push({ x: p + 1, y: leaf.y, w: leaf.x + leaf.w - p - 1, h: leaf.h });
-    } else {
-      const p = rng.int(leaf.y + MIN_CHAMBER, leaf.y + leaf.h - MIN_CHAMBER - 1);
-      leaves.push({ x: leaf.x, y: leaf.y, w: leaf.w, h: p - leaf.y });
-      leaves.push({ x: leaf.x, y: p + 1, w: leaf.w, h: leaf.y + leaf.h - p - 1 });
-    }
+  let plan = LAYOUTS[style](rng, w, h, target);
+  if (!plan) {
+    room.layoutStyle = 'classic';
+    plan = LAYOUTS.classic(rng, w, h, target);
   }
+  const leaves = plan.leaves;
+  room.voids = plan.voids;
   if (leaves.length < 2) return null;
   leaves.sort((a, b) => a.x - b.x || a.y - b.y);
   room.chambers = leaves;
@@ -153,9 +297,12 @@ function buildLayout(rng, level, m) {
     const ra = find(e.a);
     const rb = find(e.b);
     const tree = ra !== rb;
-    if (!tree && !(extras < 2 + Math.floor(lv / 5) && rng.chance(0.22))) continue;
+    // Every chamber beside the spine opens onto it; a grand hall gets most of its doors.
+    const hub = [leaves[e.a].role, leaves[e.b].role];
+    const open = !tree && (hub.includes('spine') || (hub.includes('hall') && rng.chance(0.6)));
+    if (!tree && !open && !(extras < 2 + Math.floor(lv / 5) && rng.chance(0.22))) continue;
     if (tree) uf[ra] = rb;
-    else extras++;
+    else if (!open) extras++;
     const p = rng.int(e.lo, e.hi - 1);
     const dc = e.vertical
       ? [
@@ -280,7 +427,8 @@ function buildLayout(rng, level, m) {
   // so every chamber keeps a walkable ring and stays connected.
   leaves.forEach((c) => {
     const innerArea = (c.w - 2) * (c.h - 2);
-    const want = Math.max(1, Math.min(6, Math.round((innerArea / 10) * rng.range(0.6, 1.1))));
+    // A grand hall is a lot of open floor: it gets more to hide behind.
+    const want = Math.max(1, Math.min(c.role === 'hall' ? 11 : 6, Math.round((innerArea / 10) * rng.range(0.6, 1.1))));
     let placed = 0;
     for (let tries = 0; tries < 40 && placed < want; tries++) {
       const [cw, ch] = rng.pick(COVER_SHAPES);
@@ -383,6 +531,16 @@ function buildLayout(rng, level, m) {
       if (behind.length) addVent(rng.pick(options), rng.pick(behind));
     }
   });
+
+  // --- corridor rooms: HVAC ducts that cross over the spine, flank to flank
+  if (room.layoutStyle === 'corridor') {
+    const side = (role) => rng.shuffle(leaves.map((_, i) => i).filter((i) => leaves[i].role === role));
+    const north = side('north');
+    const south = side('south');
+    const want = 1 + (lv >= 6 && rng.chance(0.5) ? 1 : 0);
+    let made = 0;
+    for (let k = 0; k < Math.min(north.length, south.length) && made < want; k++) if (addVent(north[k], south[k])) made++;
+  }
 
   // --- crawl vents between chambers, favouring long skips
   {

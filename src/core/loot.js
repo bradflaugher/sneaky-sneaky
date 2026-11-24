@@ -45,6 +45,14 @@ export const LOOT = [
   { id: 'crown', name: 'A Crown For A Very Small King', flavor: 'The king is a corgi. Long may he reign.', prop: 'crown', themes: ['museum'] },
   { id: 'floppy', name: 'A Floppy Disk Containing One (1) Excellent JPEG', flavor: '1.44 megabytes of pure art.', prop: 'floppy', themes: ['vr', 'office'] },
   { id: 'canteen', name: 'Canteen of Suspiciously Good Soup', flavor: "The mess hall's only secret worth keeping.", prop: 'canteen', themes: ['bunker'] },
+  { id: 'chips', name: "The House's Only Honest Poker Chip", flavor: 'Kept under guard so it does not give the others ideas.', prop: 'chips', themes: ['casino'] },
+  { id: 'dice', name: 'A Pair of Dice That Only Roll Sevens', flavor: 'Retired undefeated. The floor manager still flinches.', prop: 'dice', themes: ['casino'] },
+  { id: 'orchid', name: 'The Second-Place Orchid (Bitter About It)', flavor: 'Lost to a begonia in 2019. Has not opened since.', prop: 'orchid', themes: ['greenhouse'] },
+  { id: 'wateringcan', name: 'A Watering Can of Great Diplomatic Importance', flavor: 'Three treaties were signed over it. One fern was saved.', prop: 'wateringcan', themes: ['greenhouse'] },
+  { id: 'fondue', name: 'The Bottomless Fondue Pot of Peak 9', flavor: 'Nobody has seen the bottom. Two forks are still missing.', prop: 'fondue', themes: ['alpine'] },
+  { id: 'cowbell', name: 'A Cowbell That Has Heard Enough', flavor: 'Rung once in 1974. The avalanche report is sealed.', prop: 'cowbell', themes: ['alpine'] },
+  { id: 'token', name: 'The Last Valid Token for Line 0', flavor: 'Good for one ride. The line has no trains.', prop: 'token', themes: ['subway'] },
+  { id: 'ticket', name: 'A Monthly Pass That Expired In 1987', flavor: 'The inspectors are still looking for whoever owes the fare.', prop: 'ticket', themes: ['subway'] },
 ];
 
 export const LOOT_BY_ID = Object.fromEntries(LOOT.map((l) => [l.id, l]));
@@ -76,6 +84,10 @@ const OWNERS = {
   lab: ["Sub-Level 9's", "Dr. Vex's", "The Lead Researcher's", "Test Subject 12's", "The Ethics Committee's", "The Night Shift's", "Containment Team B's", "The Grant Committee's"],
   bunker: ["The General's", "The Colonel's", "The Quartermaster's", "The Garrison's", "Sergeant Pickles'", "The Mess Hall's", "The Motor Pool's", "Command's"],
   museum: ["The Curator's", "The Duchess's", "The Benefactor's", "The Restorer's", "The Late Baron's", "The East Wing's", "A Forger's", "The Trustees'"],
+  casino: ["The Pit Boss's", "The House's", "The High Roller's", "The Croupier's", "The Card Counter's", "The Whale's", "Table Nine's", "The Cashier Cage's"],
+  greenhouse: ["The Head Botanist's", "The Orchid Society's", "The Night Gardener's", "The Fern Committee's", "A Carnivorous Plant's", "The Seed Bank's", "The Topiarist's", "Greenhouse Four's"],
+  alpine: ["The Lodge Owner's", "The Ski Instructor's", "The Countess's", "Ski Patrol's", "The Fondue Chef's", "The Lift Operator's", "A Snowed-In Guest's", "The Yodelling Champion's"],
+  subway: ["The Station Master's", "The Transit Authority's", "Lost Property's", "The Night Conductor's", "The Archivist's", "Platform Zero's", "A Fare Dodger's", "The Signalman's"],
   vr: ["The Simulation's", "Admin's", "Player Two's", "The Dev Team's", "Build 0.9.3's", "The Tutorial's", "A Speedrunner's", "The QA Department's"],
 };
 
@@ -312,9 +324,9 @@ export const MISSION_VERBS = [
 ];
 // Some objects suit some jobs: you decrypt a floppy, you rescue a frog.
 const SHAPE_BIAS = {
-  intel: ['floppy', 'tape', 'typewriter', 'radio', 'phone', 'case', 'cube', 'globe', 'bust'],
-  recovery: ['duck', 'frog', 'gnome', 'cactus', 'trophy', 'crown', 'urn', 'teapot', 'jar', 'croissant', 'wheel', 'pin', 'house'],
-  tinker: ['toaster', 'espresso', 'clock', 'lamp', 'lava', 'stapler', 'bottle', 'mug', 'hydrant', 'cone', 'lighthouse', 'rook'],
+  intel: ['floppy', 'tape', 'typewriter', 'radio', 'phone', 'case', 'cube', 'globe', 'bust', 'ticket', 'token'],
+  recovery: ['duck', 'frog', 'gnome', 'cactus', 'trophy', 'crown', 'urn', 'teapot', 'jar', 'croissant', 'wheel', 'pin', 'house', 'orchid', 'cowbell', 'chips'],
+  tinker: ['toaster', 'espresso', 'clock', 'lamp', 'lava', 'stapler', 'bottle', 'mug', 'hydrant', 'cone', 'lighthouse', 'rook', 'dice', 'wateringcan', 'fondue'],
 };
 
 /** Roll the assignment for a target. Deterministic for a given rng. */

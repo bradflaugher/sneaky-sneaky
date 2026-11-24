@@ -207,6 +207,138 @@ const FLOORS = {
     }
     grit(g, s, rng, { stains: 4, cracks: 0 });
   },
+  // emerald casino carpet: a lattice of teal diamonds with gold trim
+  baize(g, s, rng) {
+    shade(g, s, '#1a6a54', '#145a4a');
+    const n = 4;
+    const t = s / n;
+    const lw = Math.max(1, Math.round(s / 256));
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const cx = (x + 0.5) * t;
+        const cy = (y + 0.5) * t;
+        const diamond = (r, c) => {
+          g.fillStyle = c;
+          g.beginPath();
+          g.moveTo(cx, cy - r);
+          g.lineTo(cx + r, cy);
+          g.lineTo(cx, cy + r);
+          g.lineTo(cx - r, cy);
+          g.closePath();
+          g.fill();
+        };
+        diamond(t * 0.5, (x + y) % 2 ? '#0f4c4a' : '#136052');
+        diamond(t * 0.3, 'rgba(226,180,80,0.5)');
+        diamond(t * 0.3 - lw * 2, (x + y) % 2 ? '#17705a' : '#0e4a48');
+        diamond(t * 0.07, '#e2b450');
+      }
+    // gold trim where the diamonds meet
+    g.strokeStyle = 'rgba(226,180,80,0.34)';
+    g.lineWidth = lw;
+    g.beginPath();
+    for (let i = -n; i <= n * 2; i++) {
+      g.moveTo(i * t, 0);
+      g.lineTo(i * t + s, s);
+      g.moveTo(i * t, 0);
+      g.lineTo(i * t - s, s);
+    }
+    g.stroke();
+    for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) rect(g, '#b0182c', x * t - lw * 2, y * t - lw * 2, lw * 4, lw * 4);
+    hatch(g, s, rng, 4, 0.1);
+    grit(g, s, rng, { stains: 3, cracks: 0 });
+  },
+  // terracotta and slate conservatory pavers, moss in the mortar
+  flagstone(g, s, rng) {
+    fill(g, s, '#3f6a3c');
+    const rows = 4;
+    const rh = s / rows;
+    const gap = Math.max(2, Math.round(s / 128));
+    for (let y = 0; y < rows; y++) {
+      const cols = y % 2 ? 3 : 2;
+      const off = y % 2 ? -s / 6 : 0;
+      for (let x = 0; x <= cols; x++) {
+        const cw = s / cols;
+        const slate = rng.chance(0.3);
+        const v = rng.int(-8, 8);
+        const [r, gg, b] = slate ? [84 + v, 96 + v, 108 + v] : [176 + v, 104 + v, 72 + v];
+        const px = off + x * cw;
+        g.fillStyle = `rgb(${r},${gg},${b})`;
+        g.fillRect(R(px + gap / 2), R(y * rh + gap / 2), R(cw - gap), R(rh - gap));
+        const gr = g.createLinearGradient(px, y * rh, px + cw, y * rh + rh);
+        gr.addColorStop(0, 'rgba(255,255,255,0.08)');
+        gr.addColorStop(1, 'rgba(0,0,0,0.12)');
+        g.fillStyle = gr;
+        g.fillRect(R(px + gap / 2), R(y * rh + gap / 2), R(cw - gap), R(rh - gap));
+      }
+    }
+    // moss creeping out of a few joints
+    for (let i = 0; i < 10; i++) {
+      g.fillStyle = `rgba(88,150,72,${rng.range(0.25, 0.5)})`;
+      g.beginPath();
+      g.ellipse(rng.range(0, s), R(rng.int(0, rows) * rh), rng.range(s * 0.02, s * 0.06), rng.range(s * 0.006, s * 0.014), 0, 0, 7);
+      g.fill();
+    }
+    hatch(g, s, rng, 6, 0.12);
+    grit(g, s, rng, { stains: 6, cracks: 3 });
+  },
+  // honey and walnut herringbone lodge planks
+  herringbone(g, s, rng) {
+    fill(g, s, '#3a2212');
+    const n = 4; // chevron columns
+    const cw = s / n;
+    const ph = s / 8; // plank thickness along v
+    const lw = Math.max(1, Math.round(s / 256));
+    for (let c = 0; c < n; c++) {
+      const up = c % 2 === 0;
+      for (let k = -2; k < 10; k++) {
+        const v = rng.int(-10, 10);
+        const walnut = rng.chance(0.3);
+        const [r, gg, b] = walnut ? [124 + v, 76 + v, 42 + v] : [196 + v, 138 + v, 70 + v];
+        const x0 = c * cw;
+        const y0 = k * ph;
+        const rise = up ? -cw : cw;
+        g.fillStyle = `rgb(${r},${gg},${b})`;
+        g.beginPath();
+        g.moveTo(x0, y0);
+        g.lineTo(x0 + cw, y0 + rise);
+        g.lineTo(x0 + cw, y0 + rise + ph);
+        g.lineTo(x0, y0 + ph);
+        g.closePath();
+        g.fill();
+        g.strokeStyle = 'rgba(52,26,10,0.8)';
+        g.lineWidth = lw;
+        g.stroke();
+        // one soft grain line down each plank
+        g.strokeStyle = 'rgba(70,36,14,0.2)';
+        g.beginPath();
+        g.moveTo(x0 + lw, y0 + ph * 0.5);
+        g.lineTo(x0 + cw - lw, y0 + rise + ph * 0.5);
+        g.stroke();
+      }
+      rect(g, 'rgba(40,20,8,0.85)', c * cw, 0, lw, s);
+    }
+    grit(g, s, rng, { stains: 5, cracks: 0 });
+  },
+  // gritty transit chequer with a yellow platform-edge stripe
+  metro(g, s, rng) {
+    panels(g, s, rng, 4, [[62, 68, 76], [92, 98, 104]], 'rgba(14,16,20,0.85)', 5);
+    const lw = Math.max(1, Math.round(s / 256));
+    const y = s * 0.44;
+    const band = s * 0.12;
+    rect(g, '#f2c230', 0, y, s, band);
+    rect(g, 'rgba(14,16,20,0.85)', 0, y, s, lw * 2);
+    rect(g, 'rgba(14,16,20,0.85)', 0, y + band - lw * 2, s, lw * 2);
+    // tactile studs along the stripe
+    g.fillStyle = 'rgba(120,84,10,0.55)';
+    for (let x = s / 32; x < s; x += s / 16)
+      for (const yy of [y + band * 0.32, y + band * 0.68]) {
+        g.beginPath();
+        g.arc(x, yy, s / 110, 0, 7);
+        g.fill();
+      }
+    hatch(g, s, rng, 8, 0.16);
+    grit(g, s, rng, { stains: 9, cracks: 6 });
+  },
   // navy-black void with electric cyan lines and a faint magenta sub-grid
   vrgrid(g, s) {
     fill(g, s, '#050818');
@@ -258,6 +390,171 @@ const WALLS = {
   gallery(g, s, rng) {
     wallBase(g, s, rng, '#5c3a6e', '#3a2448', { line: '#e2b450', lineY: 0.7, base: '#27162f', baseY: 0.71 });
     rect(g, '#b0182c', 0, s * 0.95, s, s * 0.02);
+  },
+  // burgundy damask above brass-trimmed art-deco wainscoting
+  casinowall(g, s, rng) {
+    wallBase(g, s, rng, '#8a1c34', '#5a1228', { base: '#3a0e22', baseY: 0.58 });
+    const lw = Math.max(1, Math.round(s / 256));
+    // faint damask diamonds on the upper wall
+    g.fillStyle = 'rgba(255,170,150,0.07)';
+    for (let y = 0; y < 3; y++)
+      for (let x = 0; x < 4; x++) {
+        const cx = (x + (y % 2 ? 0.5 : 0)) * (s / 4) + s / 8;
+        const cy = s * 0.1 + y * s * 0.17;
+        g.beginPath();
+        g.moveTo(cx, cy - s * 0.06);
+        g.lineTo(cx + s * 0.04, cy);
+        g.lineTo(cx, cy + s * 0.06);
+        g.lineTo(cx - s * 0.04, cy);
+        g.fill();
+      }
+    // brass chair rail, then stepped deco panels in the wainscot
+    rect(g, '#e2b450', 0, s * 0.56, s, lw * 5);
+    rect(g, '#7a5a1c', 0, s * 0.56 + lw * 5, s, lw * 2);
+    g.strokeStyle = '#c89a3a';
+    g.lineWidth = lw * 2;
+    for (let i = 0; i < 2; i++) {
+      const x0 = i * (s / 2) + s * 0.06;
+      const pw = s / 2 - s * 0.12;
+      g.strokeRect(R(x0), R(s * 0.64), R(pw), R(s * 0.26));
+      // sunburst fan rising from the panel foot
+      g.lineWidth = lw;
+      for (let k = -3; k <= 3; k++) {
+        g.beginPath();
+        g.moveTo(x0 + pw / 2, s * 0.9);
+        g.lineTo(x0 + pw / 2 + k * pw * 0.13, s * 0.68 + Math.abs(k) * s * 0.022);
+        g.stroke();
+      }
+      g.lineWidth = lw * 2;
+    }
+    rect(g, '#e2b450', 0, s * 0.955, s, lw * 4);
+  },
+  // wrought-iron mullions over misty teal glass, on a low brick plinth
+  glasshouse(g, s, rng) {
+    const gr = g.createLinearGradient(0, 0, 0, s);
+    gr.addColorStop(0, '#2f6a66');
+    gr.addColorStop(0.55, '#3f8a80');
+    gr.addColorStop(1, '#245650');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, s, s);
+    // condensation: pale mist pooling low on each pane, a few runs
+    for (let i = 0; i < 2; i++) {
+      const m = g.createLinearGradient(0, s * 0.3, 0, s * 0.8);
+      m.addColorStop(0, 'rgba(200,255,240,0)');
+      m.addColorStop(1, 'rgba(200,255,240,0.2)');
+      g.fillStyle = m;
+      g.fillRect(i * (s / 2), s * 0.3, s / 2, s * 0.5);
+    }
+    g.strokeStyle = 'rgba(210,255,245,0.22)';
+    g.lineWidth = Math.max(1, s / 256);
+    for (let i = 0; i < 9; i++) {
+      const x = rng.range(0, s);
+      const y = rng.range(s * 0.08, s * 0.5);
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + rng.range(-3, 3), y + rng.range(s * 0.05, s * 0.2));
+      g.stroke();
+    }
+    // leaf shadows pressed against the glass
+    for (let i = 0; i < 7; i++) {
+      g.fillStyle = `rgba(12,48,36,${rng.range(0.25, 0.45)})`;
+      g.beginPath();
+      g.ellipse(rng.range(0, s), rng.range(s * 0.45, s * 0.8), rng.range(s * 0.03, s * 0.07), rng.range(s * 0.012, s * 0.025), rng.range(-1, 1), 0, 7);
+      g.fill();
+    }
+    const iron = '#141c1c';
+    const bar = Math.max(3, Math.round(s / 48));
+    for (let i = 0; i <= 2; i++) rect(g, iron, Math.min(s - bar, i * (s / 2) - bar / 2), 0, bar, s);
+    for (const y of [0.0, 0.26, 0.54]) rect(g, iron, 0, s * y, s, bar);
+    // arched heads on the top lights
+    g.strokeStyle = iron;
+    g.lineWidth = bar * 0.7;
+    for (let i = 0; i < 2; i++) {
+      g.beginPath();
+      g.arc(i * (s / 2) + s / 4, s * 0.26, s / 4 - bar, Math.PI, 0);
+      g.stroke();
+    }
+    rect(g, '#5a3a30', 0, s * 0.82, s, s * 0.18);
+    rect(g, iron, 0, s * 0.82, s, bar);
+    const lw = Math.max(1, Math.round(s / 256));
+    for (let r = 0; r < 3; r++) {
+      rect(g, 'rgba(70,110,70,0.6)', 0, s * (0.88 + r * 0.045), s, lw);
+      for (let x = (r % 2) * (s / 8); x < s; x += s / 4) rect(g, 'rgba(70,110,70,0.6)', x, s * (0.835 + r * 0.045), lw, s * 0.045);
+    }
+  },
+  // dark cedar beams over rough alpine slate
+  timber(g, s, rng) {
+    wallBase(g, s, rng, '#8a6a4a', '#6a4c34');
+    const lw = Math.max(1, Math.round(s / 256));
+    // horizontal cedar boards
+    for (let i = 0; i < 5; i++) {
+      const y = (i * s * 0.6) / 5;
+      const v = rng.int(-10, 10);
+      rect(g, `rgb(${116 + v},${76 + v},${46 + v})`, 0, y, s, (s * 0.6) / 5);
+      rect(g, 'rgba(36,18,8,0.75)', 0, y, s, lw);
+      g.strokeStyle = 'rgba(50,26,10,0.22)';
+      g.lineWidth = lw;
+      g.beginPath();
+      const gy = y + rng.range(s * 0.03, s * 0.09);
+      g.moveTo(0, gy);
+      g.bezierCurveTo(s * 0.3, gy + rng.range(-5, 5), s * 0.7, gy + rng.range(-5, 5), s, gy);
+      g.stroke();
+    }
+    // slate stonework below the dado
+    const y0 = s * 0.6;
+    rect(g, '#2c3440', 0, y0, s, s - y0);
+    for (let r = 0; r < 3; r++) {
+      const rh = (s - y0) / 3;
+      let x = r % 2 ? -s * 0.1 : 0;
+      while (x < s) {
+        const sw = rng.range(s * 0.16, s * 0.3);
+        const v = rng.int(-10, 10);
+        g.fillStyle = `rgb(${74 + v},${84 + v},${98 + v})`;
+        g.fillRect(R(x + lw), R(y0 + r * rh + lw), R(sw - lw * 2), R(rh - lw * 2));
+        x += sw;
+      }
+    }
+    // heavy dark posts and the dado beam
+    const post = Math.round(s / 14);
+    rect(g, '#2e1a10', 0, 0, post, s);
+    rect(g, '#2e1a10', s / 2 - post / 2, 0, post, y0);
+    rect(g, '#2e1a10', 0, y0 - post / 2, s, post);
+    rect(g, '#2e1a10', 0, 0, s, post * 0.8);
+    rect(g, 'rgba(255,200,140,0.14)', 0, y0 - post / 2, s, lw * 2);
+    hatch(g, s, rng, 5, 0.14);
+  },
+  // glazed off-white subway brick, dark grout, one amber-and-slate line band
+  subwaytile(g, s, rng) {
+    fill(g, s, '#23282e');
+    const rows = 10;
+    const th = s / rows;
+    const tw = s / 4;
+    const gap = Math.max(1, Math.round(s / 200));
+    for (let y = 0; y < rows; y++) {
+      const off = y % 2 ? -tw / 2 : 0;
+      const low = y >= rows - 2;
+      for (let x = 0; x <= 4; x++) {
+        const v = rng.int(-7, 5);
+        const [r, gg, b] = low ? [78 + v, 90 + v, 102 + v] : [226 + v, 224 + v, 210 + v];
+        g.fillStyle = `rgb(${r},${gg},${b})`;
+        g.fillRect(R(off + x * tw + gap), R(y * th + gap), R(tw - gap * 2), R(th - gap * 2));
+        // the glaze: a pale catch-light along the top edge of each brick
+        g.fillStyle = low ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.4)';
+        g.fillRect(R(off + x * tw + gap), R(y * th + gap), R(tw - gap * 2), Math.max(1, R(th * 0.12)));
+      }
+    }
+    // the line colour: an amber band with slate keylines at eye level
+    rect(g, '#23282e', 0, th * 3 - gap, s, th + gap * 2);
+    rect(g, '#ffa820', 0, th * 3 + gap, s, th - gap * 2);
+    rect(g, '#3ad8e8', 0, th * 4 + gap * 2, s, Math.max(2, gap * 2));
+    // decades of soot gathering toward the floor
+    const soot = g.createLinearGradient(0, s * 0.5, 0, s);
+    soot.addColorStop(0, 'rgba(10,12,16,0)');
+    soot.addColorStop(1, 'rgba(10,12,16,0.3)');
+    g.fillStyle = soot;
+    g.fillRect(0, s * 0.5, s, s * 0.5);
+    hatch(g, s, rng, 4, 0.14);
+    grit(g, s, rng, { stains: 6, cracks: 3 });
   },
   vrwall(g, s) {
     const lw = Math.max(1, Math.round(s / 256));
@@ -374,6 +671,9 @@ const MISC = {
     }
   },
 };
+
+export const FLOOR_KEYS = Object.keys(FLOORS);
+export const WALL_KEYS = Object.keys(WALLS);
 
 export function floorTexture(name) {
   return make(`floor:${name}`, 512, FLOORS[name]);
@@ -619,6 +919,198 @@ const BACKDROPS = {
       }
     }
   },
+  // the conservatory grounds: layered canopies, palms, lamp-lit paths in the mist
+  garden(g, W, H, rng) {
+    const layers = [
+      [H * 0.42, 60, '#143c38'],
+      [H * 0.56, 46, '#0e2e2a'],
+      [H * 0.72, 34, '#08201c'],
+    ];
+    layers.forEach(([base, rough, color], li) => {
+      g.fillStyle = color;
+      // rounded tree crowns shouldering along the horizon
+      const first = base + rng.range(-rough, rough) * 0.3;
+      g.beginPath();
+      g.moveTo(0, H);
+      g.lineTo(0, first);
+      for (let x = 0; x < W; ) {
+        const cw = rng.range(50, 130);
+        const top = base + rng.range(-rough, rough * 0.4);
+        const end = Math.min(W, x + cw);
+        g.quadraticCurveTo(x + (end - x) / 2, top - cw * 0.35, end, end >= W ? first : base + rng.range(-rough * 0.3, rough * 0.3));
+        x = end;
+      }
+      g.lineTo(W, H);
+      g.closePath();
+      g.fill();
+      // a few palms standing proud of the canopy
+      for (let i = 0; i < 5; i++) {
+        const px = rng.range(40, W - 40);
+        const top = base - rng.range(40, 90);
+        g.strokeStyle = color;
+        g.lineWidth = 5;
+        g.beginPath();
+        g.moveTo(px, base + 20);
+        g.quadraticCurveTo(px + rng.range(-14, 14), (base + top) / 2, px, top);
+        g.stroke();
+        g.lineWidth = 4;
+        for (let k = 0; k < 7; k++) {
+          const a = Math.PI + (k / 6) * Math.PI;
+          g.beginPath();
+          g.moveTo(px, top);
+          g.quadraticCurveTo(px + Math.cos(a) * 26, top + Math.sin(a) * 26 - 10, px + Math.cos(a) * 46, top + Math.sin(a) * 14 + 16);
+          g.stroke();
+        }
+      }
+      // mist lying between the layers, and warm path lamps in the nearest
+      const mist = g.createLinearGradient(0, base, 0, base + 90);
+      mist.addColorStop(0, 'rgba(140,230,200,0)');
+      mist.addColorStop(1, `rgba(140,230,200,${0.1 + li * 0.04})`);
+      g.fillStyle = mist;
+      g.fillRect(0, base, W, 90);
+    });
+    for (let i = 0; i < 16; i++) {
+      const lx = rng.range(0, W);
+      const ly = rng.range(H * 0.74, H * 0.92);
+      const gl = g.createRadialGradient(lx, ly, 0, lx, ly, 26);
+      gl.addColorStop(0, 'rgba(255,190,110,0.85)');
+      gl.addColorStop(1, 'rgba(255,190,110,0)');
+      g.fillStyle = gl;
+      g.fillRect(lx - 26, ly - 26, 52, 52);
+    }
+  },
+  // moonlit peaks: snowfields, blue shadow faces, a black line of pines
+  peaks(g, W, H, rng) {
+    const layers = [
+      [H * 0.34, 120, '#5a78b8', '#e8f0ff'],
+      [H * 0.52, 90, '#34508e', '#c8d8f8'],
+      [H * 0.7, 50, '#1e2f62', '#9ab4e8'],
+    ];
+    for (const [base, rough, color, snow] of layers) {
+      const pts = [];
+      let y = base;
+      const y0 = y;
+      for (let x = 0; x <= W; x += rng.range(70, 150)) {
+        pts.push([x, y]);
+        y = base + rng.range(-rough, rough * 0.5);
+      }
+      pts.push([W, y0]);
+      g.fillStyle = color;
+      g.beginPath();
+      g.moveTo(0, H);
+      for (const [px, py] of pts) g.lineTo(px, py);
+      g.lineTo(W, H);
+      g.closePath();
+      g.fill();
+      // moonlit snow on the left face of every summit
+      g.fillStyle = snow;
+      for (let i = 1; i < pts.length - 1; i++) {
+        const [px, py] = pts[i];
+        if (py > pts[i - 1][1] || py > pts[i + 1][1]) continue;
+        const [lx, ly] = pts[i - 1];
+        g.beginPath();
+        g.moveTo(px, py);
+        g.lineTo(px + (lx - px) * 0.55, py + (ly - py) * 0.55);
+        g.lineTo(px + (lx - px) * 0.3, py + (ly - py) * 0.55 + 14);
+        g.lineTo(px - 6, py + (ly - py) * 0.4 + 26);
+        g.lineTo(px + 10, py + 30);
+        g.closePath();
+        g.fill();
+      }
+    }
+    // the treeline: ink-dark pines, a few lit chalet windows among them
+    for (let x = 0; x < W; x += rng.range(12, 26)) {
+      const th = rng.range(34, 84);
+      const by = H * 0.86 + rng.range(-10, 10);
+      g.fillStyle = '#0a1230';
+      g.beginPath();
+      g.moveTo(x, by - th);
+      g.lineTo(x + th * 0.24, by);
+      g.lineTo(x - th * 0.24, by);
+      g.closePath();
+      g.fill();
+    }
+    g.fillStyle = '#0a1230';
+    g.fillRect(0, H * 0.86, W, H * 0.14);
+    for (let i = 0; i < 22; i++) {
+      g.fillStyle = 'rgba(255,186,96,0.9)';
+      g.fillRect(R(rng.range(0, W)), R(rng.range(H * 0.82, H * 0.9)), 6, 5);
+    }
+  },
+  // the running tunnels: tiled arches, a dead platform, signal lamps in the dark
+  tunnel(g, W, H, rng) {
+    g.fillStyle = '#0c1118';
+    g.fillRect(0, 0, W, H);
+    for (let x = 0; x < W; x += 256) {
+      // tunnel mouth
+      const gr = g.createRadialGradient(x + 128, H * 0.66, 10, x + 128, H * 0.66, 130);
+      gr.addColorStop(0, '#02030a');
+      gr.addColorStop(0.7, '#060a12');
+      gr.addColorStop(1, '#141c26');
+      g.fillStyle = gr;
+      g.beginPath();
+      g.moveTo(x + 40, H);
+      g.lineTo(x + 40, H * 0.56);
+      g.quadraticCurveTo(x + 128, H * 0.2, x + 216, H * 0.56);
+      g.lineTo(x + 216, H);
+      g.fill();
+      // tiled arch ring, amber line band above it
+      g.strokeStyle = '#c8c6b8';
+      g.lineWidth = 9;
+      g.beginPath();
+      g.moveTo(x + 40, H);
+      g.lineTo(x + 40, H * 0.56);
+      g.quadraticCurveTo(x + 128, H * 0.2, x + 216, H * 0.56);
+      g.lineTo(x + 216, H);
+      g.stroke();
+      g.strokeStyle = 'rgba(10,12,16,0.6)';
+      g.lineWidth = 2;
+      for (let k = 0; k < 9; k++) {
+        const yy = H * (0.6 + k * 0.045);
+        g.beginPath();
+        g.moveTo(x + 35, yy);
+        g.lineTo(x + 45, yy);
+        g.moveTo(x + 211, yy);
+        g.lineTo(x + 221, yy);
+        g.stroke();
+      }
+      // rails converging into the dark, a signal lamp at the mouth
+      g.strokeStyle = 'rgba(160,180,200,0.4)';
+      g.beginPath();
+      g.moveTo(x + 86, H);
+      g.lineTo(x + 122, H * 0.68);
+      g.moveTo(x + 170, H);
+      g.lineTo(x + 134, H * 0.68);
+      g.stroke();
+      const sig = rng.chance(0.3) ? '255,70,60' : rng.chance(0.5) ? '58,216,232' : '255,168,32';
+      const gl = g.createRadialGradient(x + 128, H * 0.62, 0, x + 128, H * 0.62, 30);
+      gl.addColorStop(0, `rgba(${sig},0.95)`);
+      gl.addColorStop(1, `rgba(${sig},0)`);
+      g.fillStyle = gl;
+      g.fillRect(x + 98, H * 0.62 - 30, 60, 60);
+      // the pier between arches: tile, an amber band, a roundel sign
+      g.fillStyle = '#1c242e';
+      g.fillRect(x - 40, 0, 80, H);
+      g.fillStyle = '#ffa820';
+      g.fillRect(x - 40, H * 0.3, 80, 12);
+      g.fillStyle = '#3ad8e8';
+      g.beginPath();
+      g.arc(x, H * 0.46, 22, 0, 7);
+      g.fill();
+      g.fillStyle = '#0c1118';
+      g.beginPath();
+      g.arc(x, H * 0.46, 13, 0, 7);
+      g.fill();
+      g.fillStyle = '#e8e4d8';
+      g.fillRect(x - 30, H * 0.46 - 5, 60, 10);
+    }
+    // conduit runs and the lamp line along the crown
+    g.fillStyle = 'rgba(255,168,48,0.5)';
+    for (let x = 60; x < W; x += 128) g.fillRect(x, H * 0.1, 26, 5);
+    g.fillStyle = '#05070c';
+    g.fillRect(0, H * 0.14, W, 4);
+    g.fillRect(0, H * 0.17, W, 3);
+  },
   // VR horizon: glow bands and receding verticals
   vr(g, W, H) {
     const gr = g.createLinearGradient(0, 0, 0, H);
@@ -635,6 +1127,8 @@ const BACKDROPS = {
     g.fillRect(0, H - 6, W, 6);
   },
 };
+
+export const BACKDROP_KEYS = Object.keys(BACKDROPS);
 
 export function backdropTexture(kind) {
   return backdropCanvas(`backdrop:${kind}`, BACKDROPS[kind]);

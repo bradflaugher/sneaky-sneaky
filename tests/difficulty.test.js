@@ -140,7 +140,7 @@ test('every preset generates verified rooms across the early tiers and all theme
       }
     });
   }
-  assert.equal(n, 72);
+  assert.equal(n, PRESET_IDS.length * THEME_IDS.length * 3);
 });
 
 test('presets really change the guards: vision, patrol speed and head-count', () => {
@@ -152,7 +152,7 @@ test('presets really change the guards: vision, patrol speed and head-count', ()
     let moving = 0;
     let rooms = 0;
     for (let i = 0; i < 10; i++) {
-      const r = generateRoom({ seed: `cmp-${i}`, level: 7, theme: THEME_IDS[i % 6], mods });
+      const r = generateRoom({ seed: `cmp-${i}`, level: 7, theme: THEME_IDS[i % THEME_IDS.length], mods });
       rooms++;
       guards += r.guards.length;
       for (const g of r.guards) {
@@ -200,8 +200,8 @@ for (const theme of THEME_IDS) {
   });
 }
 
-test(`large compounds and mega-facilities: ${big.length} rooms across all 6 themes generate fast`, () => {
-  assert.equal(big.length, 30);
+test(`large compounds and mega-facilities: ${big.length} rooms across all ${THEME_IDS.length} themes generate fast`, () => {
+  assert.equal(big.length, THEME_IDS.length * BIG_TIERS.length);
   assert.deepEqual([...new Set(big.map((b) => b.room.themeId))].sort(), [...THEME_IDS].sort());
   const total = big.reduce((s, b) => s + b.ms, 0);
   const worst = Math.max(...big.map((b) => b.ms));
@@ -247,7 +247,7 @@ test('rooms genuinely sprawl as tiers climb: bigger grids, more chambers, vents,
   };
   const large = (r) => r.level >= 8 && r.level < 14;
   const mega = (r) => r.level >= 14;
-  const starter = Array.from({ length: 12 }, (_, i) => generateRoom({ seed: `small-${i}`, level: 1, theme: THEME_IDS[i % 6] }));
+  const starter = Array.from({ length: 12 }, (_, i) => generateRoom({ seed: `small-${i}`, level: 1, theme: THEME_IDS[i % THEME_IDS.length] }));
   const savg = (f) => starter.reduce((s, r) => s + f(r), 0) / starter.length;
   for (const f of [(r) => r.w * r.h, (r) => r.chambers.length, (r) => r.guards.length, (r) => r.vents.length]) {
     assert.ok(avg(large, f) > savg(f) * 1.5, 'large compounds dwarf starter rooms');

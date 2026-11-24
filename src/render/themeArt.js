@@ -7,6 +7,8 @@
 //   rim:  [colour, intensity]           lamp: [colour, intensity] per chamber
 //   grade: [shadow tint, highlight tint] used by the comic finishing pass
 //   accent: the saturated prop colour    cap: wall-top trim
+//   env: what lies beyond the walls       hall: [backdrop, floor tint] for interiors
+//   rain / snow: weather                  glossy: a polished floor that blooms lamp pools
 
 export const ART = {
   // Midnight indigo and emerald sea, golden deck lamps, ivory and mahogany trim.
@@ -88,6 +90,7 @@ export const ART = {
     bloom: 0.36,
     grade: [0x0a2c44, 0xfff2d8],
     env: 'void',
+    hall: ['sublevel', 0x6f8a90],
   },
   // Twilight indigo shadows, burnt sienna walls, gold tungsten shafts.
   bunker: {
@@ -141,6 +144,7 @@ export const ART = {
     bloom: 0.36,
     grade: [0x200c40, 0xffe0a0],
     env: 'void',
+    hall: ['hall', 0x7a6a8a],
   },
   // Holographic graphic novel: navy-black void, electric cyan, magenta accents.
   vr: {
@@ -169,6 +173,120 @@ export const ART = {
     bloom: 0.42,
     grade: [0x0a0840, 0xd8f4ff],
     env: 'vrgrid',
+  },
+  // Ruby and indigo shadows, emerald baize, amber chandeliers over brass trim.
+  casino: {
+    floor: 'baize',
+    wall: 'casinowall',
+    outer: 'solid',
+    cap: 0x6e4c1a,
+    capMetal: 0.3,
+    sky: [
+      [0, '#0a0418'],
+      [0.4, '#1c0a3a'],
+      [0.5, '#5a1838'],
+      [0.54, '#1a0a30'],
+      [1, '#06030f'],
+    ],
+    stars: 60,
+    fog: [0x1a0a2c, 0.012],
+    hemi: [0x9a78e8, 0x341426, 1.4],
+    sun: [0xd0b8ff, 1.8, [-0.55, 0.76, -0.34]],
+    rim: [0xff5a6a, 0.5],
+    lamp: [0xffb83a, 18],
+    glow: 0xffc85a,
+    accent: 0xc0283a,
+    motes: 0xffe0a0,
+    exposure: 1.2,
+    bloom: 0.4,
+    grade: [0x2a0c44, 0xffd890],
+    env: 'skyline',
+  },
+  // Moonlit emerald-teal mist under iron and glass, warm grow-lamps, rain on the panes.
+  greenhouse: {
+    floor: 'flagstone',
+    wall: 'glasshouse',
+    outer: 'glass',
+    cap: 0x1a2a26,
+    capMetal: 0.4,
+    sky: [
+      [0, '#03100f'],
+      [0.4, '#0a2a2a'],
+      [0.5, '#1f5a4a'],
+      [0.54, '#0a2420'],
+      [1, '#020a0a'],
+    ],
+    stars: 50,
+    fog: [0x0c2a26, 0.016],
+    hemi: [0x7fe0c0, 0x1c3024, 1.45],
+    sun: [0xc0f0e0, 1.9, [0.4, 0.84, 0.36]],
+    rim: [0x4fe8a0, 0.5],
+    lamp: [0xffa85a, 15],
+    glow: 0xff9ad0,
+    accent: 0xd0a040,
+    motes: 0xd8ffb0,
+    exposure: 1.18,
+    bloom: 0.38,
+    grade: [0x0a3438, 0xffe2b8],
+    env: 'garden',
+    rain: true,
+  },
+  // Icy blue moonlight on snow, honey timber and a hearth-amber glow.
+  alpine: {
+    floor: 'herringbone',
+    wall: 'timber',
+    outer: 'solid',
+    cap: 0x3a2418,
+    sky: [
+      [0, '#060c26'],
+      [0.4, '#16285a'],
+      [0.5, '#5a7ab8'],
+      [0.53, '#1a2a56'],
+      [1, '#050818'],
+    ],
+    stars: 140,
+    fog: [0x16224a, 0.011],
+    hemi: [0x9ab8ff, 0x3a2c30, 1.55],
+    sun: [0xc8dcff, 2.1, [-0.42, 0.8, -0.42]],
+    rim: [0x7fd0ff, 0.55],
+    lamp: [0xff9a3a, 17],
+    glow: 0xffa040,
+    accent: 0xc8302a,
+    motes: 0xf0f6ff,
+    exposure: 1.2,
+    bloom: 0.36,
+    grade: [0x14205a, 0xffd8a0],
+    env: 'alpine',
+    snow: true,
+    glossy: true,
+  },
+  // Sodium-amber platform lamps, cyan signage, glazed tile receding into tunnels.
+  subway: {
+    floor: 'metro',
+    wall: 'subwaytile',
+    outer: 'solid',
+    cap: 0x23282e,
+    capMetal: 0.4,
+    sky: [
+      [0, '#05070c'],
+      [0.5, '#101820'],
+      [1, '#040508'],
+    ],
+    stars: 0,
+    fog: [0x10161e, 0.016],
+    hemi: [0x8aa8c0, 0x2a2420, 1.3],
+    sun: [0xffe8c8, 1.8, [0.3, 0.92, -0.24]],
+    rim: [0x3ad8e8, 0.6],
+    lamp: [0xffa030, 15],
+    glow: 0x3ad8e8,
+    accent: 0xffa820,
+    motes: 0xffd8a0,
+    exposure: 1.16,
+    bloom: 0.38,
+    grade: [0x101c34, 0xffdca0],
+    env: 'void',
+    hall: ['tunnel', 0x6a7078],
+    glossy: true,
   },
 };
 
