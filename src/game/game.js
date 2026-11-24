@@ -10,11 +10,13 @@ import { RNG, randomSeedString } from '../core/rng.js';
 import { FLOOR, cellAt, hasLineOfSight, findPath, nearestFloorCell } from '../core/grid.js';
 import { generateRoom } from '../core/generator.js';
 import { poseAt, angDiff } from '../core/patrol.js';
-import { canSee, canChoke, isBumping, detectRate, rankFor } from '../core/stealth.js';
+import { canSee, canChoke, isBumping, detectRate, rankFor, CALLOUT_RADIUS, ALERT_SEARCH_TIME, ALERT_DETECT_MULT, guardsInEarshot, effectiveVision } from '../core/stealth.js';
 import { THEMES, THEME_IDS } from '../core/themes.js';
 import { crawlRoute, pointAlong } from '../core/ducts.js';
 import { VENT_COLORS } from '../render/themeArt.js';
-import { resolveMods, tierFor, describeRun, describeSetup, setupFromParams, setupToParams, normalizeSetup } from '../core/difficulty.js';
+import { PRESETS, resolveMods, tierFor, describeRun, describeSetup, setupFromParams, setupToParams, normalizeSetup, modeFromParams, modeToParams, gameTypeOf } from '../core/difficulty.js';
+import { infiniteRoom, describeInfinite, INFINITE_MODS } from '../core/infinite.js';
+import { caseRoomSpec, describeCase } from '../core/caseCatalog.js';
 
 import { buildWorld } from '../render/world.js';
 import { buildCharacter, animateCharacter, settleCharacter, addSilhouette, disposeCharacter, setSpriteCamera, guardSpec, agentSpec, yawOf } from '../render/character.js';
@@ -25,7 +27,7 @@ import { createComicPass, VISUAL_STYLES } from '../render/comicPass.js';
 import { CameraRig } from './camera.js';
 import { Input } from './input.js';
 import { GameAudio } from './audio.js';
-import { loadSave, storeSave, recordLoot } from './save.js';
+import { loadSave, storeSave, recordLoot, recordRoom, modeCaseFiles } from './save.js';
 import { UI } from '../ui/ui.js';
 import { Radar } from '../ui/radar.js';
 import { SetupPanel } from '../ui/setup.js';
@@ -70,6 +72,10 @@ export class Game {
     this.save = loadSave();
     this.lowPower = params.has('lowpower') || window.matchMedia('(pointer: coarse)').matches;
     this.fixedSeed = params.get('seed');
+    // 'mission' is the normal ladder; 'infinite' is the Endless Run (?mode=infinite).
+    // While a Case File is being played the mode is 'case' and `activeCase` is its catalog entry.
+    this.mode = modeFromParams(params);
+    this.activeCase = null;
     this.levelOffset = Math.max(0, (parseInt(params.get('level') || '1', 10) || 1) - 1);
     // URL params win over saved settings, so shared links reproduce a setup.
     this.setup = setupFromParams(params, this.save.settings.setup);
@@ -86,7 +92,9 @@ export class Game {
     });
     this.input.onFirstGesture = () => this.audio.unlock();
     this.ui = new UI({
-      start: () => this.startRun(),
+      start: () => this.startRun('mission'),
+      infinite: () => this.startRun('infinite'),
+      reroll: () => this.reroll(),
       vault: () => this.openVault(),
       setup: () => this.openSetup(),
       resume: () => this.resume(),
@@ -95,6 +103,7 @@ export class Game {
       quit: () => this.enterTitle(),
       next: () => this.nextRoom(),
       back: () => this.back(),
+      playCase: (entry) => this.startCase(entry),
       pause: () => this.pause(),
       style: () => this.toggleStyle(),
     });
@@ -105,7 +114,7 @@ export class Game {
         this.audio.ui();
       }
     });
-    this.setupPanel = new SetupPanel((setup) => this.applySetup(setup));
+    this.setupPanel = new SetupPanel((setup) => this.applySetup(setup), null, () => modeCaseFiles(this.save));
     this.radar = new Radar(document.getElementById('radar'));
     // ---- renderer
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -207,10 +216,19 @@ export class Game {
       this.world.dispose();
     }
 
-    const theme = this.themeFor(roomNo);
-    const level = attract ? roomNo : tierFor(roomNo, this.setup) + this.levelOffset;
-    const room = generateRoom({ seed: `${this.run.seed}#${roomNo}`, level, theme, mods: attract ? null : this.mods });
-    this.lastTheme = theme;
+    let room;
+    if (!attract && this.activeCase) {
+      // A Case File: its exact setting, floor plan, seed, tier and target.
+      room = generateRoom(caseRoomSpec(this.activeCase, this.mods));
+    } else if (!attract && this.mode === 'infinite') {
+      // Endless Run: setting, floor plan, size and assignment are all rolled per room.
+      room = generateRoom(infiniteRoom(this.run.seed, roomNo));
+    } else {
+      const theme = this.themeFor(roomNo);
+      const level = attract ? roomNo : tierFor(roomNo, this.setup) + this.levelOffset;
+      room = generateRoom({ seed: `${this.run.seed}#${roomNo}`, level, theme, mods: attract ? null : this.mods });
+    }
+    this.lastTheme = room.themeId;
     this.room = room;
     this.attract = attract;
     this.world = buildWorld(room, { lowPower: this.lowPower });
@@ -256,7 +274,7 @@ export class Game {
     this.clearT = 0;
     this.ctx = null;
     for (const g of this.guards) {
-      Object.assign(g, { state: 'patrol', clock: 0, meter: 0, peak: 0, timer: 0, path: null, pi: 0, blend: 0, wake: null, found: false, speed: 0, zT: 0, lastSeen: null });
+      Object.assign(g, { state: 'patrol', clock: 0, meter: 0, peak: 0, timer: 0, alertT: 0, shoutCd: 0, path: null, pi: 0, blend: 0, wake: null, found: false, speed: 0, zT: 0, lastSeen: null });
       poseAt(g.def.timeline, 0, g.pose);
       g.rig.root.position.set(g.pose.x, 0, g.pose.z);
       g.rig.root.rotation.y = yawOf(g.pose.ang);
@@ -288,6 +306,11 @@ export class Game {
   // ------------------------------------------------------------ flow
 
   enterTitle(first = false) {
+    if (this.activeCase) {
+      // a Case File is a one-room detour: the title goes back to the mode it had
+      this.activeCase = null;
+      this.mode = this.modeBeforeCase;
+    }
     if (!first && !this.attract) {
       this.run.seed = this.fixedSeed || randomSeedString();
       this.attract = true;
@@ -298,13 +321,67 @@ export class Game {
     this.playerRig.root.visible = false;
     this.ui.setHud(false);
     this.ui.hideBanner();
-    this.ui.setTitle({ seed: this.run.seed, setupLine: describeSetup(this.setup) });
+    if (!first) this.syncUrl(false); // leave the address bar alone until the player does something
+    this.showTitle();
+  }
+
+  showTitle() {
+    this.ui.setMode(this.mode, false);
+    this.ui.setTitle({ seed: this.run.seed, setupLine: describeSetup(this.setup), dossiers: modeCaseFiles(this.save) });
     this.ui.show('title');
   }
 
-  /** "SECTOR 07 · LARGE COMPOUND · OPERATIVE · CLASSIC RAMP" for the current room. */
+  /**
+   * The active mode and room, for the HUD, loading card and clear screen:
+   * "ENDLESS RUN · SEED 7QK2 · ROOM 07 · STREAK 3" or
+   * "SECTOR 07 · LARGE COMPOUND · OPERATIVE · CLASSIC RAMP".
+   */
   runLabel() {
+    if (this.mode === 'infinite') return describeInfinite(this.run.roomNo, this.run.seed, this.run.streak);
+    if (this.activeCase) return `${describeCase(this.activeCase)} · ${PRESETS[this.setup.difficulty].name.toUpperCase()}`;
     return describeRun(this.run.roomNo, this.setup);
+  }
+
+  /** The multipliers in force for the room being played. */
+  activeMods() {
+    return this.mode === 'infinite' ? INFINITE_MODS : this.mods;
+  }
+
+  /**
+   * Keep the address bar shareable: setup, run mode and, when it is pinned or
+   * an infinite run is under way, the seed (`?mode=infinite&seed=...`).
+   */
+  syncUrl(inRun = this.state !== 'title') {
+    const params = setupToParams(this.setup, new URLSearchParams(location.search));
+    modeToParams(this.mode, params);
+    const seed = this.fixedSeed || (this.mode === 'infinite' && inRun ? this.run.seed : null);
+    if (seed) params.set('seed', seed);
+    else params.delete('seed');
+    const q = params.toString();
+    history.replaceState(null, '', q ? `?${q}` : location.pathname);
+  }
+
+  /**
+   * NEW SEED: on the title it rolls the seed the next run will use. Paused or
+   * on the clear screen of an infinite run it jumps straight into room 1 of a
+   * fresh seed; abandoning a room that way gives up the streak, banking one
+   * first does not.
+   */
+  reroll() {
+    const from = this.state;
+    if (from !== 'title' && !(this.mode === 'infinite' && (from === 'paused' || from === 'clear'))) return;
+    this.fixedSeed = null; // a pinned ?seed= is replaced, not obeyed
+    this.run.seed = randomSeedString();
+    if (from === 'title') {
+      this.syncUrl(false);
+      this.ui.setTitle({ seed: this.run.seed, setupLine: describeSetup(this.setup), dossiers: modeCaseFiles(this.save), rolled: true });
+      return;
+    }
+    this.audio.uiBig();
+    this.run.roomNo = 1;
+    if (from === 'paused') this.run.streak = 0;
+    this.lastTheme = null;
+    this.beginRoom();
   }
 
   /** Called on every change in the Mission Setup panel. */
@@ -314,23 +391,40 @@ export class Game {
     this.save.settings.setup = { ...this.setup };
     storeSave(this.save);
     this.ui.setSetupLine(describeSetup(this.setup), describeRun(this.returnTo === 'paused' ? this.run.roomNo : 1, this.setup));
-    // keep the address bar shareable
-    const params = setupToParams(this.setup, new URLSearchParams(location.search));
-    const q = params.toString();
-    history.replaceState(null, '', q ? `?${q}` : location.pathname);
+    this.syncUrl(this.returnTo === 'paused');
   }
 
   openSetup() {
     this.returnTo = this.state === 'paused' ? 'paused' : 'title';
     this.themeBefore = this.setup.theme;
     this.state = 'setup';
-    this.setupPanel.open(this.setup, this.returnTo === 'paused');
+    this.setupPanel.open(this.setup, this.returnTo === 'paused', this.returnTo === 'paused' && this.mode === 'infinite');
     this.ui.setSetupLine(describeSetup(this.setup), describeRun(this.returnTo === 'paused' ? this.run.roomNo : 1, this.setup));
     this.ui.setHud(false);
     this.ui.show('setup');
   }
 
-  startRun() {
+  /** Start a run in `mode`: 'mission' (the difficulty ladder) or 'infinite'. */
+  startRun(mode = this.mode) {
+    if (this.state !== 'title') return;
+    this.mode = mode === 'infinite' ? 'infinite' : 'mission';
+    this.audio.unlock();
+    this.audio.uiBig();
+    this.run.roomNo = 1;
+    this.run.streak = 0;
+    this.lastTheme = null;
+    this.beginRoom();
+  }
+
+  /**
+   * PLAY CASE / REPLAY on a Case File card: straight into that case's exact
+   * room. It is filed under the difficulty chosen in Mission Setup.
+   */
+  startCase(entry) {
+    if (!entry || (this.state !== 'vault' && this.state !== 'title')) return;
+    this.modeBeforeCase = this.mode;
+    this.mode = 'case';
+    this.activeCase = entry;
     this.audio.unlock();
     this.audio.uiBig();
     this.run.roomNo = 1;
@@ -345,6 +439,8 @@ export class Game {
     this.state = 'loading';
     // Big compounds take a moment to generate and verify: say so first.
     await this.ui.loading(this.runLabel());
+    this.syncUrl(true);
+    this.ui.setMode(this.mode, true);
     this.loadRoom(this.run.roomNo, false);
     this.camRig.setMode(this.save.settings.cam === 'tactical' ? 'tactical' : 'chase', true);
     this.camRig.snap(this.player.x, this.player.z);
@@ -358,13 +454,21 @@ export class Game {
     const loot = room.loot.info;
     const tip = TIPS[this.run.roomNo - 1];
     // A quick lower-third strip that gets out of the way: tips linger a touch longer.
-    const tipNow = this.run.roomNo <= TIPS.length && this.setup.start === 'compact' ? tip : null;
-    this.ui.banner(`ISSUE #${String(this.run.roomNo).padStart(2, '0')} · ${room.venue}`, `${loot.mission.verb}: ${loot.name}`, tipNow || loot.tagline, tipNow ? 3.4 : 1.8);
+    const infinite = this.mode === 'infinite';
+    const tipNow = !infinite && !this.activeCase && this.run.roomNo <= TIPS.length && this.setup.start === 'compact' ? tip : null;
+    const eyebrow = this.activeCase ? `CASE FILE · ${this.activeCase.caseId}` : `${infinite ? 'ENDLESS RUN · ROOM' : 'ISSUE'} #${String(this.run.roomNo).padStart(2, '0')}`;
+    this.ui.banner(`${eyebrow} · ${room.venue}`, `${loot.mission.verb}: ${loot.name}`, tipNow || loot.tagline, tipNow ? 3.4 : 1.8);
     this.ui.hintKeys();
   }
 
   nextRoom() {
     if (this.state !== 'clear') return;
+    if (this.activeCase) {
+      // a case is one room: back to the Case Files, where its card now reads CLOSED
+      this.enterTitle();
+      this.openVault();
+      return;
+    }
     this.run.roomNo++;
     this.beginRoom();
   }
@@ -408,8 +512,7 @@ export class Game {
       this.ui.show('pause');
     } else {
       this.state = 'title';
-      this.ui.setTitle({ seed: this.run.seed, setupLine: describeSetup(this.setup) });
-      this.ui.show('title');
+      this.showTitle();
       if (themeChanged) {
         // show the chosen setting behind the menu
         this.lastTheme = null;
@@ -471,15 +574,13 @@ export class Game {
     const s = this.stats;
     const res = rankFor({ time: s.time, par: this.room.par, knockouts: s.knockouts, closeCalls: s.closeCalls });
     const loot = this.room.loot.info;
-    const isNew = recordLoot(this.save, loot, res.rank, { venue: this.room.venue, sector: this.run.roomNo, theme: this.room.themeId });
+    // every game type (each difficulty, and Endless Run) keeps its own mini case file
+    const gameType = gameTypeOf(this.mode, this.setup);
+    const isNew = recordLoot(this.save, loot, res.rank, { venue: this.room.venue, sector: this.activeCase ? this.activeCase.level : this.run.roomNo, theme: this.room.themeId, mode: gameType });
     this.run.streak++;
-    const st = this.save.stats;
-    st.rooms++;
-    if (res.ghost) st.ghosts++;
-    st.knockouts += s.knockouts;
-    st.bestStreak = Math.max(st.bestStreak, this.run.streak);
+    recordRoom(this.save, gameType, { ghost: res.ghost, streak: this.run.streak, knockouts: s.knockouts });
     storeSave(this.save);
-    this.result = { ...res, time: s.time, par: this.room.par, knockouts: s.knockouts, closeCalls: s.closeCalls, loot, venue: this.room.venue, isNew, streak: this.run.streak, meta: this.runLabel() };
+    this.result = { ...res, time: s.time, par: this.room.par, knockouts: s.knockouts, closeCalls: s.closeCalls, loot, venue: this.room.venue, isNew, streak: this.run.streak, meta: this.runLabel(), infinite: this.mode === 'infinite' };
     this.audio.stopMusic();
     this.audio.fanfare();
     this.fx.burst(this.player.x, 1.2, this.player.z, 0x5aff9a, 26);
@@ -501,7 +602,7 @@ export class Game {
     if (input.take('mute')) this.toggleMute();
     switch (this.state) {
       case 'title':
-        if (input.take('confirm')) this.startRun();
+        if (input.take('confirm')) this.startRun(this.mode); // Enter repeats the mode the link or the last run chose
         break;
       case 'playing':
         if (input.take('pause')) this.pause();
@@ -913,6 +1014,28 @@ export class Game {
     g.timer = 0;
   }
 
+  /**
+   * A guard shouts ("HEY!", "WAKE UP!", etc.) and nearby awake colleagues within
+   * earshot become heightened and move to investigate the same spot.
+   */
+  callOut(caller, line, targetX, targetZ) {
+    if (caller.shoutCd > 0) return;
+    caller.shoutCd = 3.5;
+    this.fx.stamp(line, '#ffd23a', caller.pose.x, 2.55, caller.pose.z, 0.82, 1.35, '#c1121f');
+    this.fx.ring(caller.pose.x, caller.pose.z, 0xff9b3a, CALLOUT_RADIUS, 0.85, 0.08);
+    const replies = ['HUH?!', 'COMING!', 'WHAT?!'];
+    const nearby = guardsInEarshot(this.guards, caller, CALLOUT_RADIUS);
+    for (let i = 0; i < nearby.length; i++) {
+      const other = nearby[i];
+      other.alertT = Math.max(other.alertT, ALERT_SEARCH_TIME);
+      other.lastSeen = { x: targetX, z: targetZ };
+      this.fx.stamp(replies[i % replies.length], '#ffd23a', other.pose.x, 2.45, other.pose.z, 0.7, 1.05, '#0b0d12');
+      if (!other.wake && other.meter < 0.5) {
+        this.investigate(other, targetX, targetZ);
+      }
+    }
+  }
+
   startReturn(g) {
     const home = poseAt(g.def.timeline, g.clock, g.tmp);
     g.state = 'return';
@@ -948,7 +1071,10 @@ export class Game {
     const t = this.time;
     let tension = 0;
     for (const g of this.guards) {
-      const vis = g.def.vis;
+      g.alertT = Math.max(0, (g.alertT || 0) - dt);
+      g.shoutCd = Math.max(0, (g.shoutCd || 0) - dt);
+      const heightened = g.alertT > 0;
+      const vis = effectiveVision(g.def.vis, heightened);
       g.speed = 0;
       let mode = 'normal';
 
@@ -979,27 +1105,34 @@ export class Game {
           g.meter += 7 * dt;
         } else if (canSee(room, g.pose, p.x, p.z, p.crouched, vis)) {
           sees = true;
-          g.meter += detectRate(dist, vis.range, p.crouched) * this.mods.detect * dt;
+          const mult = this.activeMods().detect * (heightened ? ALERT_DETECT_MULT : 1);
+          g.meter += detectRate(dist, vis.range, p.crouched) * mult * dt;
         }
         if (sees) {
           g.lastSeen = { x: p.x, z: p.z };
           g.peak = Math.max(g.peak, g.meter);
           if (g.meter >= 1) {
+            this.callOut(g, 'HEY!!', p.x, p.z);
             this.fail(`${THEMES[room.themeId].guard} ${SPOTTED[Math.floor(Math.random() * SPOTTED.length)]}`, g);
             return;
           }
         }
       }
-      if (!sees) g.meter = Math.max(0, g.meter - 0.45 * dt);
+      if (!sees) g.meter = Math.max(0, g.meter - (heightened ? 0.3 : 0.45) * dt);
 
-      // a guard who finds a napping colleague goes to wake them
-      if (live && (g.state === 'patrol' || g.state === 'return')) {
+      // a guard who finds a napping colleague gets suspicious, calls out to nearby guards, and searches
+      if (live && (g.state === 'patrol' || g.state === 'return' || g.state === 'look' || g.state === 'investigate')) {
         for (const s of this.guards) {
           if (s.state !== 'asleep' || s.found) continue;
           if (!canSee(room, g.pose, s.pose.x, s.pose.z, true, vis)) continue;
           s.found = true;
+          g.alertT = ALERT_SEARCH_TIME;
+          g.peak = Math.max(g.peak, 0.7);
+          this.stats.closeCalls++;
           this.investigate(g, s.pose.x, s.pose.z, s);
           this.audio.suspicious();
+          this.callOut(g, 'HEY! WAKE UP!', s.pose.x, s.pose.z);
+          this.ui.toast('GUARD SPOTTED A DOWNED COLLEAGUE!', 2.0);
           break;
         }
       }
@@ -1019,8 +1152,10 @@ export class Game {
           if (g.meter > 0.3) {
             g.state = 'suspicious';
             g.timer = 0;
+            g.alertT = Math.max(g.alertT, ALERT_SEARCH_TIME * 0.6);
             this.stats.closeCalls++;
             this.audio.suspicious();
+            if (g.lastSeen) this.callOut(g, 'HEY!', g.lastSeen.x, g.lastSeen.z);
           }
           break;
         }
@@ -1029,16 +1164,20 @@ export class Game {
           if (g.lastSeen) g.pose.ang = approachAngle(g.pose.ang, Math.atan2(g.lastSeen.z - g.pose.z, g.lastSeen.x - g.pose.x), 3.2 * dt);
           g.timer = sees ? 0 : g.timer + dt;
           if (g.timer > 1.0) {
-            if (g.peak >= 0.5 && g.lastSeen) this.investigate(g, g.lastSeen.x, g.lastSeen.z);
-            else this.startReturn(g);
+            if (g.peak >= 0.5 && g.lastSeen) {
+              g.alertT = Math.max(g.alertT, ALERT_SEARCH_TIME);
+              this.callOut(g, 'OVER HERE!', g.lastSeen.x, g.lastSeen.z);
+              this.investigate(g, g.lastSeen.x, g.lastSeen.z);
+            } else this.startReturn(g);
             g.peak = 0;
           }
           break;
         }
         case 'investigate': {
-          if (this.followPath(g, dt, INVESTIGATE_SPEED)) {
+          const moveSpeed = heightened ? INVESTIGATE_SPEED * 1.15 : INVESTIGATE_SPEED;
+          if (this.followPath(g, dt, moveSpeed)) {
             g.state = 'look';
-            g.timer = g.wake ? 1.5 : 2.8;
+            g.timer = g.wake ? 1.8 : heightened ? 3.4 : 2.8;
             g.baseAng = g.pose.ang;
           }
           break;
@@ -1046,14 +1185,17 @@ export class Game {
         case 'look': {
           mode = 'look';
           g.timer -= dt;
-          g.pose.ang = g.baseAng + Math.sin((2.8 - g.timer) * 1.6) * 1.1;
+          const sweepSpeed = heightened ? 2.1 : 1.6;
+          const sweepArc = heightened ? 1.35 : 1.1;
+          g.pose.ang = g.baseAng + Math.sin((3.4 - g.timer) * sweepSpeed) * sweepArc;
           if (g.timer <= 0) {
             if (g.wake && g.wake.state === 'asleep') {
               const s = g.wake;
               s.found = false;
+              s.alertT = ALERT_SEARCH_TIME;
               s.cone.setVisible(true);
               this.startReturn(s);
-              this.ui.toast('SOMEONE WOKE THEIR COLLEAGUE', 1.8);
+              this.ui.toast('SOMEONE WOKE THEIR COLLEAGUE — BOTH ARE ON EDGE', 2.0);
             }
             g.wake = null;
             this.startReturn(g);
@@ -1061,7 +1203,7 @@ export class Game {
           break;
         }
         case 'return': {
-          if (this.followPath(g, dt, g.def.speed + 0.2)) {
+          if (this.followPath(g, dt, g.def.speed + (heightened ? 0.45 : 0.2))) {
             g.state = 'patrol';
             g.blend = 0.7;
           }
@@ -1072,8 +1214,8 @@ export class Game {
       g.rig.root.position.set(g.pose.x, 0, g.pose.z);
       g.rig.root.rotation.y = yawOf(g.pose.ang);
       animateCharacter(g.rig, { mode, speed: g.speed, t }, dt);
-      g.cone.update(room, g.pose, vis, Math.min(1, g.meter), false, t);
-      const wary = g.state === 'suspicious' || g.state === 'investigate' || g.state === 'look';
+      g.cone.update(room, g.pose, vis, Math.min(1, heightened ? Math.max(g.meter, 0.35) : g.meter), false, t);
+      const wary = g.state === 'suspicious' || g.state === 'investigate' || g.state === 'look' || heightened;
       if (wary || g.meter > 0.12) g.icon.set('?', g.pose.x, g.rig.height + 0.3, g.pose.z, wary ? Math.max(0.6, g.meter) : g.meter, dt);
       else g.icon.set(null);
       tension = Math.max(tension, g.meter, wary ? 0.45 : 0);

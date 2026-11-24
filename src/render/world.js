@@ -191,6 +191,67 @@ export function buildWorld(room, { lowPower = false } = {}) {
     // canyon mesas all round, catching the last of the sun
     backdrop('mesas', reach * 0.5 + 34, 26, -3, 2);
     moon(60, 36, 50, 6, 0xfff0d0);
+  } else if (art.env === 'garden') {
+    // a walled night garden: wet lawn, clipped hedges, lamp-lit paths in the mist
+    ground(std(0x12332c), -0.04);
+    backdrop('garden', reach * 0.5 + 60, 44, -6, 2, 0.8);
+    backdrop('garden', reach * 0.5 + 32, 24, -4, 3);
+    moon(-46, 38, 62, 9, 0xd8fff0);
+    for (let i = 0; i < 18; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(reach * 0.72 + 5, reach * 0.5 + 26);
+      const x = w / 2 + Math.cos(a) * d;
+      const z = h / 2 + Math.sin(a) * d * 0.85;
+      if (i % 3 === 0) {
+        // a path lamp with a warm pool at its foot
+        mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.5, 10), std(0x141c1c), group, false).position.set(x, 0.75, z);
+        mesh(new THREE.SphereGeometry(0.16, 14, 10), glowMat(0xffb060, 2), group, false).position.set(x, 1.56, z);
+        decal(0xffb060, 6, x, z, 0.24, -0.02);
+      } else {
+        const bush = mesh(new THREE.SphereGeometry(1, 18, 12), std(i % 2 ? 0x1c4a3a : 0x235a40), group, false);
+        bush.scale.set(rng.range(1.2, 3), rng.range(0.9, 2), rng.range(1.2, 3));
+        bush.position.set(x, -0.1, z);
+      }
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = reach * 0.5 + rng.range(3, 16);
+      const mist = decal(0x9fe8c8, rng.range(10, 18), w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d * 0.85, 0.06, 0.35);
+      const x0 = mist.position.x;
+      animated.push((t) => {
+        mist.position.x = x0 + Math.sin(t * 0.1 + i) * 3;
+        mist.material.opacity = 0.045 + 0.025 * Math.sin(t * 0.27 + i * 2);
+      });
+    }
+  } else if (art.env === 'alpine') {
+    // a moonlit snowfield running out to the pines and the peaks
+    ground(std(0x35467c), -0.04);
+    for (let i = 0; i < 14; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(reach * 0.75 + 6, reach * 0.5 + 30);
+      const drift = mesh(new THREE.SphereGeometry(1, 24, 12), std(0x4a5c98), group, false);
+      drift.scale.set(rng.range(6, 15), rng.range(0.8, 2.4), rng.range(5, 11));
+      drift.position.set(w / 2 + Math.cos(a) * d, -0.35, h / 2 + Math.sin(a) * d);
+      drift.rotation.y = rng.range(0, 3);
+    }
+    // snow-laden pines standing close round the lodge
+    const pineM = std(0x12284a);
+    const snowM = std(0x9fb4e6);
+    for (let i = 0; i < 20; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(reach * 0.7 + 5, reach * 0.5 + 24);
+      const x = w / 2 + Math.cos(a) * d;
+      const z = h / 2 + Math.sin(a) * d * 0.9;
+      const k = rng.range(0.8, 1.5);
+      for (let tier = 0; tier < 3; tier++) {
+        const r = (1.5 - tier * 0.38) * k;
+        mesh(new THREE.ConeGeometry(r, 2.1 * k, 9), pineM, group, false).position.set(x, (1.3 + tier * 1.25) * k, z);
+        mesh(new THREE.ConeGeometry(r * 0.72, 0.9 * k, 9), snowM, group, false).position.set(x, (2.0 + tier * 1.25) * k, z);
+      }
+    }
+    backdrop('peaks', 180, 110, -34, 2, 0.85);
+    backdrop('peaks', reach * 0.5 + 44, 34, -5, 2);
+    moon(-58, 46, -52, 11, 0xe8f2ff);
   } else if (art.env === 'vrgrid') {
     const tex = floorTexture('vrgrid').clone();
     tex.repeat.set(125, 125);
@@ -222,8 +283,9 @@ export function buildWorld(room, { lowPower = false } = {}) {
     outer.repeat.set(125, 125);
     outer.needsUpdate = true;
     disposables.push(outer);
-    ground(new THREE.MeshStandardMaterial({ map: outer, color: lab ? 0x6f8a90 : 0x7a6a8a, roughness: 0.6 }), -0.05);
-    const hall = backdrop(lab ? 'sublevel' : 'hall', reach * 0.62 + 20, 30, -7, lab ? 3 : 4, lab ? 0.9 : 0.8);
+    const [hallKind, hallTint] = art.hall || ['hall', 0x7a6a8a];
+    ground(new THREE.MeshStandardMaterial({ map: outer, color: hallTint, roughness: 0.6 }), -0.05);
+    const hall = backdrop(hallKind, reach * 0.62 + 20, 30, -7, hallKind === 'hall' ? 4 : 3, hallKind === 'hall' ? 0.8 : 0.9);
     hall.material.fog = true;
     if (lab) {
       // glowing conduit pipes rising out of the dark, and mist along the floor
@@ -248,6 +310,21 @@ export function buildWorld(room, { lowPower = false } = {}) {
         });
       }
     }
+    if (room.themeId === 'subway') {
+      // the platform edge beyond the walls: signal lamps and sodium pools down the line
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2 + 0.2;
+        const d = reach * 0.62 + rng.range(4, 12);
+        const x = w / 2 + Math.cos(a) * d;
+        const z = h / 2 + Math.sin(a) * d * 0.8;
+        const col = i % 4 === 0 ? 0xff4a3a : i % 2 ? 0xffa030 : 0x3ad8e8;
+        mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), std(0x1c2228), group, false).position.set(x, 1.6, z);
+        const lampHead = mesh(new THREE.SphereGeometry(0.2, 14, 10), glowMat(col, 2.2), group, false);
+        lampHead.position.set(x, 3.3, z);
+        decal(col, 7, x, z, 0.2);
+        if (i % 4 === 0) animated.push((t) => (lampHead.visible = Math.sin(t * 2.2 + i) > -0.2));
+      }
+    }
   }
 
   // ------------------------------------------------------------ floor
@@ -258,7 +335,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     // VR is unlit phosphor on black, exactly as drawn
     // Elsewhere the floor is the one PBR surface: a soft sheen lets lamp pools
     // bloom across the dark instead of stepping in toon bands.
-    const glossy = art.floor === 'marble' || art.floor === 'tile' || art.floor === 'teak';
+    const glossy = art.glossy || art.floor === 'marble' || art.floor === 'tile' || art.floor === 'teak';
     const mat = room.themeId === 'vr' ? new THREE.MeshBasicMaterial({ map: tex }) : new THREE.MeshStandardMaterial({ map: tex, roughness: glossy ? 0.42 : 0.72, metalness: glossy ? 0.12 : 0 });
     const f = mesh(new THREE.PlaneGeometry(w, h), mat, group, false);
     f.rotation.x = -Math.PI / 2;
@@ -293,7 +370,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
   // the camera and the room can sink out of the way (dollhouse cutaway).
   const railMat = std(0xb8862a);
   const frameMat = std(0x0c0d12);
-  const glassMat = std(0x4ac8b0, { transparent: true, opacity: 0.07, depthWrite: false });
+  const glassMat = std(0x4ac8b0, { transparent: true, opacity: room.themeId === 'greenhouse' ? 0.13 : 0.07, depthWrite: false });
   const sides = [
     { r: { x: 0, y: 0, w, h: 1 }, hidden: (c) => c.z < 0.5 },
     { r: { x: 0, y: h - 1, w, h: 1 }, hidden: (c) => c.z > h - 0.5 },
@@ -350,7 +427,8 @@ export function buildWorld(room, { lowPower = false } = {}) {
     ammo: std(0xffffff, { map: miscTexture('ammo') }),
     fabric: std(0x5f78b8, { map: miscTexture('fabric') }),
     white: std(0xcfc6b0),
-    leather: std(0xd6ccb4),
+    leather: std({ casino: 0x8a1c34, alpine: 0x9a5a34 }[room.themeId] ?? 0xd6ccb4),
+    baize: std(0x1a6a54),
     brass: std(0xe0b040),
     metal: std(0xffffff, { map: miscTexture('metal') }),
     darkmetal: std(0x262a3a),
@@ -399,7 +477,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
     const at = (a, cross = 0) => (long ? [a, cross] : [cross, a]);
     switch (c.kind) {
       case 'pedestal': {
-        const base = room.themeId === 'vr' ? M.holo : room.themeId === 'museum' ? M.marble : M.darkmetal;
+        const base = room.themeId === 'vr' ? M.holo : room.themeId === 'museum' || room.themeId === 'casino' ? M.marble : room.themeId === 'alpine' ? M.darkwood : M.darkmetal;
         b(base, 0.74, 0.12, 0.74, 0, 0.06, 0);
         part(g, unitCyl, base, 0.5, 0.7, 0.5, 0, 0.47, 0);
         b(base, 0.66, 0.1, 0.66, 0, 0.87, 0);
@@ -473,6 +551,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
       case 'bar': {
         b(M.walnut, cw - 0.12, 0.96, ch - 0.12, 0, 0.48, 0);
         b(M.brass, cw - 0.04, 0.05, ch - 0.04, 0, 0.985, 0);
+        if (room.themeId === 'casino') b(M.baize, cw - 0.18, 0.02, ch - 0.18, 0, 1.015, 0, false); // a card table, not a drinks bar
         const cols = [0x3fb24f, 0xd9432f, 0xffd12e, 0x7fd4ff, 0xf4f1ea];
         for (let i = 0; i < L * 2; i++) {
           const [x, z] = at(along(i, L * 2) + rng.range(-0.1, 0.1), rng.range(-0.2, 0.2));
@@ -684,6 +763,92 @@ export function buildWorld(room, { lowPower = false } = {}) {
             d.add(ring);
             disposables.push(ring.geometry);
             if (roll < 0.5) p(unitCyl, glowMat(0x7fd4ff, 0.9), 0.5, 0.02, 0.5, 0, 1.5, 0.03).rotation.x = Math.PI / 2;
+          } else if (t === 'casino') {
+            if (roll < 0.45) {
+              // an art-deco fan sconce throwing amber up the damask
+              p(unitBox, M.brass, 0.1, 0.34, 0.08, 0, 1.5, 0.05);
+              for (const k of [-1, 0, 1]) p(unitBox, M.warm, 0.07, 0.3 - Math.abs(k) * 0.08, 0.04, k * 0.11, 1.74 - Math.abs(k) * 0.04, 0.07).rotation.z = -k * 0.35;
+              decal(0xffb83a, 2.2, d.position.x - dx * 0.5, d.position.z - dy * 0.5, 0.16);
+            } else if (roll < 0.8) {
+              // a gilt-framed portrait of somebody who won big
+              const pw = rng.range(0.5, 0.75);
+              p(unitBox, M.gold, pw + 0.14, 0.94, 0.05, 0, 1.52, 0.03);
+              p(unitBox, std(0xffffff, { map: paintings(rng.int(0, 5)), roughness: 0.6 }), pw, 0.8, 0.02, 0, 1.52, 0.055);
+            } else {
+              // a slot machine against the wall, reels glowing
+              p(unitBox, M.velvet, 0.62, 1.5, 0.4, 0, 0.75, 0.2, true);
+              p(unitBox, M.gold, 0.66, 0.08, 0.44, 0, 1.52, 0.2);
+              p(unitBox, M.gold, 0.66, 0.06, 0.44, 0, 0.72, 0.2);
+              for (const k of [-1, 0, 1]) p(unitBox, glowMat(rng.pick([0xffd24a, 0xff5a6a, 0x5aff9a]), 1.8), 0.14, 0.2, 0.01, k * 0.17, 1.2, 0.405);
+              p(unitCyl, M.brass, 0.04, 0.4, 0.04, 0.37, 1.15, 0.22);
+              p(unitSph, std(0xc0283a), 0.1, 0.1, 0.1, 0.37, 1.38, 0.22);
+            }
+          } else if (t === 'greenhouse') {
+            if (roll < 0.55) {
+              // a hanging basket trailing ivy from a wrought-iron bracket
+              p(unitBox, M.darkmetal, 0.05, 0.05, 0.4, 0, 1.95, 0.2);
+              p(unitCyl, M.darkmetal, 0.015, 0.3, 0.015, 0, 1.8, 0.36);
+              p(unitSph, M.darkwood, 0.36, 0.24, 0.36, 0, 1.58, 0.36);
+              const fern = p(unitIco, M.leaf, 0.56, 0.36, 0.56, 0, 1.72, 0.36);
+              for (const k of [-1, 1]) p(unitSph, M.leaf, 0.1, 0.5, 0.1, k * 0.18, 1.3, 0.38);
+              p(unitSph, glowMat(art.glow, 1.1), 0.1, 0.1, 0.1, 0.12, 1.86, 0.44);
+              const ph = rng.range(0, 6);
+              animated.push((tt) => (fern.rotation.z = Math.sin(tt * 0.7 + ph) * 0.05));
+            } else if (roll < 0.8) {
+              // a grow-lamp bar washing the wall in warm light
+              p(unitBox, M.darkmetal, 0.8, 0.07, 0.12, 0, 2.0, 0.1);
+              p(unitBox, M.warm, 0.72, 0.03, 0.08, 0, 1.955, 0.1);
+              decal(0xffa85a, 2.6, d.position.x - dx * 0.5, d.position.z - dy * 0.5, 0.18);
+            } else {
+              // a brass specimen label and a climbing vine
+              p(unitBox, M.brass, 0.34, 0.2, 0.02, 0, 1.3, 0.03);
+              const vine = p(unitCyl, M.leaf, 0.04, 1.9, 0.04, 0.34, 1.0, 0.05);
+              vine.rotation.z = 0.06;
+              for (let k = 0; k < 5; k++) p(unitSph, M.leaf, 0.2, 0.08, 0.14, 0.34 + (k % 2 ? 0.1 : -0.1), 0.4 + k * 0.36, 0.08);
+            }
+          } else if (t === 'alpine') {
+            if (roll < 0.4) {
+              // crossed skis over the mantel
+              for (const k of [-1, 1]) {
+                const ski = p(unitBox, std(k > 0 ? 0xc8302a : 0x1e2f5a), 0.09, 1.5, 0.03, 0, 1.4, 0.04 + (k > 0 ? 0.03 : 0));
+                ski.rotation.z = k * 0.5;
+              }
+              p(unitBox, M.brass, 0.12, 0.12, 0.03, 0, 1.4, 0.09);
+            } else if (roll < 0.7) {
+              // a hearth lantern on an iron hook
+              p(unitBox, M.darkmetal, 0.04, 0.04, 0.3, 0, 1.95, 0.15);
+              p(unitBox, M.darkmetal, 0.2, 0.05, 0.2, 0, 1.82, 0.26);
+              p(unitBox, M.warm, 0.14, 0.24, 0.14, 0, 1.67, 0.26);
+              p(unitBox, M.darkmetal, 0.2, 0.04, 0.2, 0, 1.53, 0.26);
+              decal(0xff9a3a, 2.4, d.position.x - dx * 0.5, d.position.z - dy * 0.5, 0.18);
+            } else {
+              // a framed trail map, snow on the sill below it
+              p(unitBox, M.darkwood, 0.9, 0.66, 0.04, 0, 1.5, 0.03);
+              p(unitBox, std(0xdfe8ff, { map: paintings(rng.int(0, 3)), roughness: 1 }), 0.8, 0.56, 0.02, 0, 1.5, 0.05);
+              p(unitBox, std(0xf0f6ff), 0.96, 0.06, 0.1, 0, 1.15, 0.06);
+            }
+          } else if (t === 'subway') {
+            if (roll < 0.4) {
+              // a station roundel: cyan ring, cream name bar
+              const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.06, 10, 28), glowMat(0x3ad8e8, 1.3));
+              ring.position.set(0, 1.55, 0.05);
+              d.add(ring);
+              disposables.push(ring.geometry);
+              p(unitBox, std(0xe8e4d8), 0.86, 0.16, 0.04, 0, 1.55, 0.06);
+              p(unitBox, M.darkmetal, 0.5, 0.04, 0.045, 0, 1.55, 0.065);
+            } else if (roll < 0.7) {
+              // a line map behind glass
+              p(unitBox, M.darkmetal, 0.84, 1.04, 0.04, 0, 1.4, 0.03);
+              p(unitBox, std(0xe8e4d8, { map: paintings(rng.int(0, 3)), roughness: 0.8 }), 0.74, 0.94, 0.02, 0, 1.4, 0.05);
+              p(unitBox, M.accent, 0.84, 0.07, 0.05, 0, 1.96, 0.035);
+            } else {
+              // a caged sodium lamp and a conduit run
+              const pipe = p(unitCyl, M.darkmetal, 0.07, 1, 0.07, 0, 2.05, 0.07, true);
+              pipe.rotation.z = Math.PI / 2;
+              p(unitBox, M.darkmetal, 0.2, 0.08, 0.16, 0, 1.9, 0.09);
+              p(unitSph, M.warm, 0.16, 0.2, 0.14, 0, 1.76, 0.1);
+              decal(0xffa030, 2.4, d.position.x - dx * 0.5, d.position.z - dy * 0.5, 0.16);
+            }
           } else {
             const pl = p(unitBox, additive(art.glow, 0.25), 0.7, 0.9, 0.01, 0, 1.4, 0.12);
             const e = new THREE.LineSegments(edgeGeo, lineMat);
@@ -725,11 +890,11 @@ export function buildWorld(room, { lowPower = false } = {}) {
     }
     // a soft pool on the floor and a faint volumetric shaft above it
     const pool = decal(art.lamp[0], 7, s.x, s.z, 0.2);
-    const lean = room.themeId === 'bunker' ? 0.3 : room.themeId === 'yacht' ? 0.12 : 0;
+    const lean = room.themeId === 'bunker' ? 0.3 : room.themeId === 'yacht' || room.themeId === 'alpine' ? 0.12 : 0;
     const sf = shaft(art.lamp[0], s.x + lean * 3, s.z, 2.3, 7, 0.06);
     sf.rotation.z = lean;
     const ph = rng.range(0, 6);
-    const dying = room.themeId === 'lab' && i % 4 === 1;
+    const dying = (room.themeId === 'lab' || room.themeId === 'subway') && i % 4 === 1;
     animated.push((t) => {
       // shafts drift and breathe, never strobe
       const k = 0.8 + 0.2 * Math.sin(t * 0.45 + ph);
@@ -761,6 +926,28 @@ export function buildWorld(room, { lowPower = false } = {}) {
     });
   }
 
+  // Snow: big slow flakes sifting down past the lamps.
+  if (art.snow && !lowPower) {
+    const n = 320;
+    const pos = new Float32Array(n * 3);
+    const seeds = [];
+    for (let i = 0; i < n; i++) seeds.push([rng.range(-5, w + 5), rng.range(0, 8), rng.range(-5, h + 5), rng.range(0.5, 1.1), rng.range(0, 6)]);
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const flakes = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xf0f6ff, size: 0.09, map: glowTex, transparent: true, opacity: 0.8, depthWrite: false, sizeAttenuation: true }));
+    flakes.frustumCulled = false;
+    group.add(flakes);
+    disposables.push(sg);
+    animated.push((t) => {
+      for (let i = 0; i < n; i++) {
+        const [x, y0, z, v, ph] = seeds[i];
+        const y = 8 - ((y0 + t * v) % 8);
+        pos.set([x + Math.sin(t * 0.6 + ph) * 0.35, y, z + Math.cos(t * 0.45 + ph) * 0.3], i * 3);
+      }
+      sg.attributes.position.needsUpdate = true;
+    });
+  }
+
   // ------------------------------------------------------------ loot
   const loot = new THREE.Group();
   loot.position.set(room.loot.x, 1.0, room.loot.z);
@@ -782,7 +969,7 @@ export function buildWorld(room, { lowPower = false } = {}) {
   });
 
   // museum: velvet rope stanchions round the prize
-  if (room.themeId === 'museum') {
+  if (room.themeId === 'museum' || room.themeId === 'casino') {
     const posts = [
       [-0.46, -0.46],
       [0.46, -0.46],
@@ -799,14 +986,15 @@ export function buildWorld(room, { lowPower = false } = {}) {
   }
 
   // moonlight through tall windows, thrown across the floor as window panes
-  if (room.themeId === 'museum' || room.themeId === 'office') {
+  const paneTint = { museum: 0xb8c0ff, office: 0x9fd8ff, greenhouse: 0xa8ffe0, alpine: 0xb8d4ff }[room.themeId];
+  if (paneTint) {
     const panes = paintedTexture('skylight', (g, sz) => {
       g.clearRect(0, 0, sz, sz);
       g.fillStyle = 'rgba(255,255,255,0.9)';
       for (let yy = 0; yy < 3; yy++) for (let xx = 0; xx < 2; xx++) g.fillRect(xx * (sz / 2) + 5, yy * (sz / 3) + 5, sz / 2 - 10, sz / 3 - 10);
     }, 128);
     for (const c of room.chambers) {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4.2), additive(room.themeId === 'museum' ? 0xb8c0ff : 0x9fd8ff, 0.07, panes));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4.2), additive(paneTint, 0.07, panes));
       m.rotation.x = -Math.PI / 2;
       m.rotation.z = 0.5;
       m.scale.x = 1.5; // sheared like a low moon

@@ -8,7 +8,7 @@ import { canSee, isBumping } from '../src/core/stealth.js';
 import { THEME_IDS } from '../src/core/themes.js';
 import { floodFromStart, roomFromAscii } from './helpers.js';
 
-const SEEDS_PER_THEME = 22; // 6 themes x 22 = 132 rooms
+const SEEDS_PER_THEME = 22; // 10 themes x 22 = 220 rooms
 const rooms = [];
 for (const theme of THEME_IDS) {
   for (let i = 0; i < SEEDS_PER_THEME; i++) {
@@ -18,8 +18,9 @@ for (const theme of THEME_IDS) {
 }
 const label = (r) => `seed=${r.seed} level=${r.level}\n${roomToAscii(r)}`;
 
-test(`generated ${rooms.length} rooms across all 6 themes`, () => {
-  assert.ok(rooms.length >= 100);
+test(`generated ${rooms.length} rooms across all ${THEME_IDS.length} themes`, () => {
+  assert.equal(THEME_IDS.length, 10);
+  assert.ok(rooms.length >= 200);
   assert.deepEqual([...new Set(rooms.map((r) => r.themeId))].sort(), [...THEME_IDS].sort());
 });
 
@@ -39,12 +40,12 @@ test('generation is deterministic for a seed', () => {
 
 test('an unspecified theme is rolled from the seed, deterministically', () => {
   const seen = new Set();
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 90; i++) {
     const a = generateRoom({ seed: `roll-${i}`, level: 1 });
     assert.equal(a.themeId, generateRoom({ seed: `roll-${i}`, level: 1 }).themeId);
     seen.add(a.themeId);
   }
-  assert.equal(seen.size, 6, 'all six themes show up');
+  assert.equal(seen.size, THEME_IDS.length, 'all ten themes show up');
 });
 
 test('every room: sane geometry, border walls, spawn/loot/exit placement', () => {
@@ -120,7 +121,7 @@ test('ghost routes survive continuous replay against real guard vision', () => {
     assert.deepEqual([end.cx, end.cy], [r.exit.cx, r.exit.cy]);
     assert.ok(end.flags & 1, 'arrives carrying the loot');
   }
-  assert.ok(replayed >= 100, `replayed ${replayed}`);
+  assert.ok(replayed >= 180, `replayed ${replayed}`);
 });
 
 test('vents: grates sit on real walls, link different chambers, and connect floor to floor', () => {

@@ -10,6 +10,30 @@ export const CHOKE_RANGE = 1.35; // metres
 export const CHOKE_REAR_ARC = 1.15; // radians either side of "directly behind"
 export const BUMP_RANGE = 0.8; // walking into a guard's front at this range is noticed at once
 export const BUMP_FRONT_ARC = 1.75; // radians either side of facing that count as "front"
+export const CALLOUT_RADIUS = 8.5; // metres a guard's "HEY!" shout carries to nearby colleagues
+export const ALERT_SEARCH_TIME = 12; // seconds a guard stays heightened after finding a downed guard or hearing a shout
+export const ALERT_DETECT_MULT = 1.4; // detection fill multiplier while heightened
+
+const HEARABLE_STATES = new Set(['patrol', 'suspicious', 'investigate', 'look', 'return']);
+
+/** Nearby awake guards within earshot of a colleague's callout. */
+export function guardsInEarshot(guards, caller, radius = CALLOUT_RADIUS) {
+  const r2 = radius * radius;
+  const out = [];
+  for (const g of guards) {
+    if (g === caller || !HEARABLE_STATES.has(g.state)) continue;
+    const dx = g.pose.x - caller.pose.x;
+    const dz = g.pose.z - caller.pose.z;
+    if (dx * dx + dz * dz <= r2) out.push(g);
+  }
+  return out;
+}
+
+/** Guard vision cone while heightened (after spotting a downed colleague or hearing a shout). */
+export function effectiveVision(vis, heightened) {
+  if (!heightened) return vis;
+  return { range: vis.range * 1.12, half: vis.half * 1.08 };
+}
 
 export function inCone(pose, x, z, range, half) {
   const dx = x - pose.x;

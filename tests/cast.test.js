@@ -72,7 +72,7 @@ test('generated guards are valid and genuinely varied in every setting', () => {
     assert.ok(count((l) => l.prop) >= 3, `${theme}: props`);
     assert.ok(count((l) => `${l.archetype}|${l.skin}|${l.hair}|${l.hairStyle}|${l.hat}|${l.eyewear}|${l.top}|${l.mustache}|${l.prop}`) >= 100, `${theme}: looks repeat too often`);
   }
-  assert.equal(seenArch.size, 5, 'all five archetypes turn up across the six settings');
+  assert.equal(seenArch.size, 5, 'all five archetypes turn up across the ten settings');
 });
 
 test('poses: walk cycle, crouch, sleeper hold, startled, asleep', () => {

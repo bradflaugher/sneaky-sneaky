@@ -185,3 +185,28 @@ export function setupToParams(setup, params = new URLSearchParams()) {
   put('theme', s.theme, 'random');
   return params;
 }
+
+// ---- run modes: the normal mission ladder, or Endless Run (?mode=infinite)
+
+export const RUN_MODES = ['mission', 'infinite'];
+
+/** Which run mode a URL asks for. Anything unrecognised is the normal mission flow. */
+export function modeFromParams(params, base = 'mission') {
+  const raw = params.has('mode') ? String(params.get('mode')).toLowerCase() : base;
+  return raw === 'infinite' || raw === 'endless' ? 'infinite' : 'mission';
+}
+
+/** Write the run mode into URL params (the default mission mode is omitted). */
+export function modeToParams(mode, params = new URLSearchParams()) {
+  if (mode === 'infinite') params.set('mode', 'infinite');
+  else params.delete('mode');
+  return params;
+}
+
+/**
+ * The game type a room counts towards in the case files: Endless Run is its
+ * own type, and a mission run is filed under its difficulty preset.
+ */
+export function gameTypeOf(mode, setup) {
+  return mode === 'infinite' ? 'infinite' : normalizeSetup(setup).difficulty;
+}

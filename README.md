@@ -49,8 +49,24 @@ Every room rolls its own mission, target and address from the seed.
   Garage*, *Ledger Tower · Floor 97 (Executive Wing)*, *Sub-Level 22 ·
   Condemned Containment D*, *VR Simulation 0x9F · Ghost Protocol 07*.
 - **Case Files** records every unique mission target with what you did to
-  it, its venue, sector, rarity, serial and best rank. It filters by rarity, pages 36 at a time, and
+  it, its venue, sector, rarity, serial and best rank. It filters by rarity, pages 48 at a time, and
   keeps the newest 500 unique items (signature pieces are never evicted).
+- **Playable Case Files**: the Case Files grid opens with a catalog of 48
+  fixed cases, 12 for each rarity (`SIGNATURE`, `ABSURD`, `RARE`,
+  `CONTRABAND`), spread over all ten settings, all four layout styles and
+  tiers 1 to 10. Every card shows the target, the assignment, the setting,
+  layout and tier, an `OPEN` or `CLOSED · BEST S` stamp, and a **PLAY CASE**
+  (or **REPLAY**) button that drops you straight into that exact room. Cases
+  are filed under the difficulty chosen in Mission Setup. Each case is the
+  natural loot roll of a stable seed (`src/core/caseCatalog.js`); cases you
+  close out in the field are listed after the catalog.
+- **Case Dossiers** sit at the top of Case Files: one dossier folder per
+  game type (Tourist, Operative, Shadow, Ghost Master, Endless Run) with its
+  rooms cleared, best-rank stamp, best streak, ghost runs and settings cleared
+  out of 10. Click a folder to filter the list to the cases closed in that
+  game type (`ALL MODES` brings back the full catalog); it combines with the rarity chips. The same summary
+  (`3 cleared · Best S`) appears on the Endless Run button and on each
+  difficulty chip in Mission Setup.
 
 Difficulty never changes the prize: target and venue depend only on the seed
 and theme.
@@ -113,11 +129,15 @@ in a smooth, lit 3D diorama.
   accents on strong edges, a rich colour grade, a rotated Ben-Day halftone
   screen in the shadow midtones, soft bloom and a gentle vignette.
   **Visual Style** in the pause menu: `Comic Print` (default) or `Clean Ink`.
-- **Six colour stories**: indigo sea and golden deck lamps on mahogany
+- **Ten colour stories**: indigo sea and golden deck lamps on mahogany
   (yacht), twilight cobalt with cyan monitors and amber pools (office),
   slate-teal with mint pods and warm-white spots (lab), indigo dusk over
   sienna stone (bunker), plum and emerald marble under gold spots with crimson
-  velvet (museum), navy void with electric cyan and magenta (VR).
+  velvet (museum), navy void with electric cyan and magenta (VR), emerald
+  baize and burgundy deco wainscot under amber chandeliers (casino), terracotta
+  pavers and misty iron-framed glass in the rain (greenhouse), honey
+  herringbone and cedar under icy moonlight and falling snow (alpine), glazed
+  subway tile and a yellow platform stripe under sodium lamps (subway).
 - **Cones and lettering**: vision cones are translucent washes with a halftone
   fill and an inked edge; `TAP! TAP!`, `SHHH...`, `ZZZ...`, `YOINK!` and the
   `?!` / `!!` bursts are drawn as hand-lettered stamps in the world.
@@ -207,12 +227,32 @@ Vision range, patrol speed and guard count feed the generator, so the ghost
 route is re-proved for whatever you pick. Detection speed only changes how
 quickly a guard who *can* see you reacts, so it never affects solvability.
 
+### Endless Run
+
+**ENDLESS RUN ∞** on the title screen (subtitle `RANDOM PROCEDURAL LEVELS ·
+NEVER RUNS OUT`; internally the `infinite` mode) is a second game type next to the
+mission ladder. It is an endless run of random-seeded rooms in which nothing
+is held constant: every room rolls a fresh setting (all ten come up before any
+repeats, never the same one twice in a row), a fresh architectural layout
+style, a fresh size and a fresh assignment. Guards are always the fair
+Operative preset, whatever Mission Setup says. The HUD, room briefing and
+clear screen show `ENDLESS RUN · SEED velvet-otter-123 · ROOM 07 · STREAK 6`,
+and there is no cap on the room number or the endless streak.
+
+**NEW SEED** on the title rolls the seed for the next run. During an endless
+run, **NEW SEED / REROLL** on the pause and clear screens jumps straight into
+room 1 of a fresh seed (from the clear screen the streak carries over; from
+pause it resets, since the room was abandoned). The address bar always holds a
+shareable `?mode=infinite&seed=...` link that replays the same run room for
+room (`src/core/infinite.js`).
+
 ### URL parameters
 
 | Parameter | Effect |
 | --- | --- |
 | `?seed=anything` | Reproducible run. Room *n* uses seed `anything#n`. |
-| `?theme=yacht\|office\|lab\|bunker\|museum\|vr` | Lock the setting. |
+| `?mode=infinite` | Endless Run. Combine with `seed` to share a run. |
+| `?theme=yacht\|office\|lab\|bunker\|museum\|vr\|casino\|greenhouse\|alpine\|subway` | Lock the setting (mission runs). |
 | `?diff=tourist\|operative\|shadow\|master` | Difficulty preset. |
 | `?ramp=steady\|gradual\|classic\|turbo` | Ramp pace. |
 | `?start=compact\|standard\|large\|mega` | Starting size. |
@@ -223,9 +263,21 @@ quickly a guard who *can* see you reacts, so it never affects solvability.
 
 ## Guaranteed-solvable rooms
 
-`src/core/generator.js` builds each room from a seed: a BSP of chambers joined
-by doorways, waist-high cover, crawl vents, laser doors with switches, a loot
+`src/core/generator.js` builds each room from a seed: chambers joined by
+doorways, waist-high cover, crawl vents, laser doors with switches, a loot
 pedestal, an extraction pad and guards on loop / ping-pong / lookout patrols.
+
+The chambers are carved in one of four architectural layout styles, rolled
+from the seed and recorded on `room.layoutStyle`:
+
+| Style | Floor plan |
+| --- | --- |
+| `classic` | A BSP split of the whole footprint. |
+| `atrium` | A generous central grand hall, always the largest chamber, with chambers either side and, on big footprints, all the way round. |
+| `wing` | An L-shaped or stepped outline: one or two outer corners are solid mass (`room.voids`), so the plan is not a plain rectangle. |
+| `corridor` | A central spine corridor with flanking chambers, each opening onto it, and HVAC ducts crossing over it. |
+
+A style that cannot fit its footprint falls back to `classic`.
 
 Every room is then checked by two verifiers in `src/core/solver.js` before it
 is ever returned:
@@ -256,7 +308,9 @@ src/core/             pure logic, no three.js, unit tested
   solver.js           topology + time-expanded ghost-route verifiers
   generator.js        room generator
   difficulty.js       presets, ramp maths, shareable setup params
-  themes.js           the six settings and the venue-name generator
+  infinite.js         Endless Run: the room plan for any (seed, room number)
+  caseCatalog.js      the 48 playable Case Files (12 per rarity)
+  themes.js           the ten settings and the venue-name generator
   loot.js             mission targets, mission verbs, signature items
   ducts.js            duct routing and the crawl path
 src/render/           three.js: 2D comic sprite illustrator, standee rigs, painted

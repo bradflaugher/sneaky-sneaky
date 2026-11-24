@@ -14,8 +14,9 @@ for (const theme of THEME_IDS) for (let i = 0; i < SEEDS; i++) drops.push({ them
 const procedural = drops.filter((d) => !d.loot.signature);
 const signature = drops.filter((d) => d.loot.signature);
 
-test(`generated ${drops.length} heist targets: ${SEEDS} seeds x 6 themes`, () => {
-  assert.equal(drops.length, 3000);
+test(`generated ${drops.length} heist targets: ${SEEDS} seeds x ${THEME_IDS.length} themes`, () => {
+  assert.equal(THEME_IDS.length, 10);
+  assert.equal(drops.length, SEEDS * THEME_IDS.length);
   assert.deepEqual([...new Set(drops.map((d) => d.theme))].sort(), [...THEME_IDS].sort());
 });
 
@@ -35,7 +36,7 @@ test('high combinatorial uniqueness: procedural names almost never repeat', () =
     const mine = procedural.filter((d) => d.theme === theme);
     assert.ok(new Set(mine.map((d) => d.loot.name)).size >= mine.length * 0.985, `${theme} repeats too much`);
   }
-  assert.ok(new Set(drops.map((d) => d.loot.name)).size >= 2500, 'over 2500 distinct targets in 3000 rooms');
+  assert.ok(new Set(drops.map((d) => d.loot.name)).size >= drops.length * 0.83, 'over 4150 distinct targets in 5000 rooms');
 });
 
 test('the name space is enormous', () => {
@@ -160,6 +161,10 @@ const VENUE_FORMAT = {
   bunker: /^Outpost [A-Z][A-Za-z ]+ · [A-Z][a-z]+ [A-Z][A-Za-z ]+ \d{1,2}$/,
   museum: /^The [A-Z][A-Za-z ]+ (Gallery|Collection|Museum|Archive|Institute|Trust) · (Wing|Hall|Vault|Salon|Rotunda|Annex) \S+ \(.+\)$/,
   vr: /^VR Simulation 0x[0-9A-F]{2} · [A-Z][a-z]+ [A-Z][a-z]+ \d{2}$/,
+  casino: /^The [A-Z][A-Za-z ]+ · [A-Z][A-Za-z -]+ \d{1,2} \(.+\)$/,
+  greenhouse: /^The [A-Z][A-Za-z ]+ (Conservatory|Gardens|Arboretum|Orangery|Glasshouse|Herbarium) · [A-Z][A-Za-z ]+ \S+ \(.+\)$/,
+  alpine: /^[A-Z][A-Za-z0-9 -]+ (Private Lodge|Chalet|Summit Club|Ski Haus|Hütte|Mountain Retreat) · [A-Z][A-Za-z ]+ \d{1,2} \(.+\)$/,
+  subway: /^Line \S+ · [A-Z][A-Za-z ]+ (Station|Junction|Depot|Interchange|Platform|Sidings) · [A-Z][A-Za-z &]+ \d{1,2}[A-Z] \(.+\)$/,
 };
 
 test('venue names: deterministic, well formed and in the thousands per theme', () => {
@@ -179,7 +184,7 @@ test('venue names: deterministic, well formed and in the thousands per theme', (
 test('rooms carry their target and venue, deterministically and independent of difficulty', () => {
   const seen = new Set();
   for (let i = 0; i < 36; i++) {
-    const theme = THEME_IDS[i % 6];
+    const theme = THEME_IDS[i % THEME_IDS.length];
     const a = generateRoom({ seed: `flav-${i}`, level: 1 + (i % 5), theme });
     const b = generateRoom({ seed: `flav-${i}`, level: 1 + (i % 5), theme, mods: { vision: 1.22, speed: 1.25, density: 1.4, puzzleShift: 4, sizeShift: 2 } });
     assert.deepEqual(a.loot.info, b.loot.info, 'difficulty changes the guards, never the prize');
