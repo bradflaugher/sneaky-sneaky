@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { RNG, hashSeed } from '../src/core/rng.js';
 import { castRay, hasLineOfSight, findPath } from '../src/core/grid.js';
 import { buildTimeline, poseAt, angDiff, TURN_SPEED } from '../src/core/patrol.js';
-import { canSee, canChoke, inCone, detectRate, isBumping, rankFor, CHOKE_RANGE, CHOKE_REAR_ARC, DEFAULT_VISION, CALLOUT_RADIUS, guardsInEarshot, effectiveVision } from '../src/core/stealth.js';
+import { canSee, visionHit, peripheralVision, canChoke, inCone, detectRate, isBumping, rankFor, CHOKE_RANGE, CHOKE_REAR_ARC, DEFAULT_VISION, PERIPHERAL_HALF, CLOSE_STAND_RANGE, CALLOUT_RADIUS, guardsInEarshot, effectiveVision } from '../src/core/stealth.js';
 import { LOOT } from '../src/core/loot.js';
 import { THEME_IDS, THEMES } from '../src/core/themes.js';
 import { roomFromAscii } from './helpers.js';
@@ -113,8 +113,52 @@ test('choke-out: only from close behind', () => {
   assert.ok(CHOKE_REAR_ARC < Math.PI / 2, 'rear arc must not reach the flanks');
 });
 
-test('choke-out rear arc never overlaps the vision cone', () => {
+test('choke-out rear arc never overlaps the vision cone or peripheral arc', () => {
   assert.ok(Math.PI - CHOKE_REAR_ARC > DEFAULT_VISION.half + 0.3);
+  assert.ok(Math.PI - CHOKE_REAR_ARC > PERIPHERAL_HALF + 0.2);
+});
+
+test('choke-out requires crouching when posture is provided', () => {
+  const g = { x: 5, z: 5, ang: 0 };
+  assert.equal(canChoke(g, 4.2, 5, true), true, 'crouched behind');
+  assert.equal(canChoke(g, 4.2, 5, false), false, 'standing behind cannot choke');
+});
+
+test('peripheral vision: catches close flanks, shrinks when crouched, and leaves a rear blind spot', () => {
+  const open = roomFromAscii([
+    '##########',
+    '#........#',
+    '#........#',
+    '#........#',
+    '#........#',
+    '#........#',
+    '##########',
+  ]);
+  const g = { x: 5, z: 3.5, ang: 0 }; // facing east (+x)
+  const pStand = peripheralVision(DEFAULT_VISION, false);
+  const pCrouch = peripheralVision(DEFAULT_VISION, true);
+  assert.ok(pStand.range > pCrouch.range);
+  assert.ok(pCrouch.range > CHOKE_RANGE, 'cannot flank-sneak into choke range even crouched');
+
+  // Directly to the side (90 deg off facing): outside main cone, inside peripheral
+  assert.equal(inCone(g, 5, 1.5, DEFAULT_VISION.range, DEFAULT_VISION.half), false);
+  assert.equal(visionHit(open, g, 5, 1.5, false), 'peripheral', 'standing beside guard at 2.0m is seen peripherally');
+  assert.equal(canSee(open, g, 5, 1.5, false), true);
+  assert.equal(visionHit(open, g, 5, 1.5, true), null, 'crouched at 2.0m is outside crouched peripheral range');
+  assert.equal(visionHit(open, g, 5, 2.0, true), 'peripheral', 'crouched beside guard at 1.5m is caught peripherally');
+
+  // Directly behind (180 deg off facing): safe only when crouched
+  assert.equal(visionHit(open, g, 4.0, 3.5, true), null, 'crouched directly behind is unseen');
+  assert.equal(canSee(open, g, 4.0, 3.5, true), false);
+  assert.equal(visionHit(open, g, 4.0, 3.5, false), 'close', 'standing right behind guard is noticed');
+  assert.equal(canSee(open, g, 4.0, 3.5, false), true);
+  assert.equal(visionHit(open, g, 5 - CLOSE_STAND_RANGE - 0.3, 3.5, false), null, 'standing behind outside close range is unseen');
+
+  // Waist-high cover hides a crouching agent in peripheral vision too
+  // In ROOM, cover is at (4, 2) and (4, 3). Guard at (3.2, 2.5) facing north (-z) has (4.8, 2.5) to their right (+x) behind cover.
+  const byCover = { x: 3.2, z: 2.5, ang: -Math.PI / 2 };
+  assert.equal(visionHit(ROOM, byCover, 4.8, 2.5, false), 'peripheral', 'standing seen over cover peripherally');
+  assert.equal(visionHit(ROOM, byCover, 4.8, 2.5, true), null, 'crouched hidden behind cover peripherally');
 });
 
 test('bumping into the front of a guard is noticed; behind is not', () => {

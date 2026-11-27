@@ -6,6 +6,14 @@ import { angDiff } from './patrol.js';
 
 export const DEFAULT_VISION = { range: 7, half: 0.52 }; // ~30 degrees either side
 
+export const PERIPHERAL_HALF = 1.75; // ~100 degrees either side (~200 deg total human peripheral FOV)
+export const PERIPHERAL_RANGE_RATIO = 0.36; // standing peripheral reach as a fraction of main cone range
+export const PERIPHERAL_MIN_RANGE = 1.8; // minimum standing peripheral reach (metres)
+export const PERIPHERAL_MAX_RANGE = 3.2; // maximum standing peripheral reach (metres)
+export const PERIPHERAL_CROUCH_MULT = 0.72; // crouching shrinks peripheral detection reach
+export const PERIPHERAL_DETECT_MULT = 0.72; // peripheral vision fills detection slightly slower than direct gaze
+export const CLOSE_STAND_RANGE = 1.65; // standing this close behind/beside a guard is noticed; must crouch to sneak up
+
 export const CHOKE_RANGE = 1.35; // metres
 export const CHOKE_REAR_ARC = 1.15; // radians either side of "directly behind"
 export const BUMP_RANGE = 0.8; // walking into a guard's front at this range is noticed at once
@@ -44,13 +52,49 @@ export function inCone(pose, x, z, range, half) {
   return Math.abs(angDiff(pose.ang, Math.atan2(dz, dx))) <= half;
 }
 
+/** Guard peripheral vision arc (wide, short-range awareness to either side). */
+export function peripheralVision(vis = DEFAULT_VISION, crouched = false) {
+  const base = Math.min(PERIPHERAL_MAX_RANGE, Math.max(PERIPHERAL_MIN_RANGE, vis.range * PERIPHERAL_RANGE_RATIO));
+  return {
+    range: crouched ? base * PERIPHERAL_CROUCH_MULT : base,
+    half: Math.max(vis.half, PERIPHERAL_HALF),
+  };
+}
+
+/**
+ * How (if at all) a guard at `pose` sees a target at (x, z):
+ *  - 'direct'     inside the main focused vision cone
+ *  - 'peripheral' inside the wide, close-range peripheral arc to either side
+ *  - 'close'      standing too close (360°) — must crouch to sneak up behind
+ *  - null         unseen
+ * A crouching target is hidden by waist-high cover; a standing one is only
+ * hidden by full walls.
+ */
+export function visionHit(room, pose, x, z, crouched, vis = DEFAULT_VISION, padRange = 0, padAngle = 0) {
+  if (inCone(pose, x, z, vis.range + padRange, vis.half + padAngle)) {
+    return hasLineOfSight(room, pose.x, pose.z, x, z, crouched) ? 'direct' : null;
+  }
+  const periph = peripheralVision(vis, crouched);
+  if (inCone(pose, x, z, periph.range + padRange, Math.min(Math.PI, periph.half + padAngle))) {
+    return hasLineOfSight(room, pose.x, pose.z, x, z, crouched) ? 'peripheral' : null;
+  }
+  if (!crouched) {
+    const dx = x - pose.x;
+    const dz = z - pose.z;
+    const closeR = CLOSE_STAND_RANGE + padRange;
+    if (dx * dx + dz * dz <= closeR * closeR && hasLineOfSight(room, pose.x, pose.z, x, z, false)) {
+      return 'close';
+    }
+  }
+  return null;
+}
+
 /**
  * Can a guard at `pose` see a target at (x, z)? A crouching target is hidden by
  * waist-high cover; a standing one is only hidden by full walls.
  */
 export function canSee(room, pose, x, z, crouched, vis = DEFAULT_VISION, padRange = 0, padAngle = 0) {
-  if (!inCone(pose, x, z, vis.range + padRange, vis.half + padAngle)) return false;
-  return hasLineOfSight(room, pose.x, pose.z, x, z, crouched);
+  return visionHit(room, pose, x, z, crouched, vis, padRange, padAngle) !== null;
 }
 
 /** Touching distance in front of a guard: they notice even at the edge of their cone. */
@@ -64,10 +108,11 @@ export function isBumping(room, pose, x, z) {
 }
 
 /**
- * Sleeper hold check: the agent must be close and inside the guard's rear arc.
- * Returns true when a choke-out can begin.
+ * Sleeper hold check: the agent must be crouching, close, and inside the
+ * guard's rear blind spot. Returns true when a choke-out can begin.
  */
-export function canChoke(pose, px, pz) {
+export function canChoke(pose, px, pz, crouched = true) {
+  if (!crouched) return false;
   const dx = px - pose.x;
   const dz = pz - pose.z;
   const d = Math.hypot(dx, dz);
