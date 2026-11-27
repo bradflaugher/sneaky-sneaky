@@ -106,8 +106,18 @@ export class Game {
       playCase: (entry) => this.startCase(entry),
       pause: () => this.pause(),
       style: () => this.toggleStyle(),
+      fullscreen: () => this.toggleFullscreen(),
     });
     this.ui.setMute(this.audio.muted);
+    this._syncFullscreen();
+    document.addEventListener('fullscreenchange', () => {
+      this._syncFullscreen();
+      this.resize();
+    });
+    document.addEventListener('webkitfullscreenchange', () => {
+      this._syncFullscreen();
+      this.resize();
+    });
     document.addEventListener('click', (e) => {
       if (e.target instanceof HTMLButtonElement) {
         this.audio.unlock();
@@ -545,6 +555,43 @@ export class Game {
     this.save.settings.cam = mode;
     storeSave(this.save);
     this.ui.toast(mode === 'chase' ? 'CAMERA: CHASE' : 'CAMERA: OVERHEAD TACTICAL', 1.3);
+  }
+
+  canFullscreen() {
+    const standalone =
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.matchMedia?.('(display-mode: fullscreen)').matches ||
+      window.navigator?.standalone === true;
+    if (standalone) return false;
+    const el = document.documentElement;
+    if (!el.requestFullscreen && !el.webkitRequestFullscreen) return false;
+    if (typeof document.fullscreenEnabled === 'boolean') return document.fullscreenEnabled;
+    if (typeof document.webkitFullscreenEnabled === 'boolean') return document.webkitFullscreenEnabled;
+    return true;
+  }
+
+  isFullscreen() {
+    return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  _syncFullscreen() {
+    this.ui.setFullscreen(this.canFullscreen(), this.isFullscreen());
+  }
+
+  toggleFullscreen() {
+    if (!this.canFullscreen()) return;
+    try {
+      if (this.isFullscreen()) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        Promise.resolve(exit?.call(document)).catch(() => {});
+      } else {
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        Promise.resolve(req?.call(el)).catch(() => {});
+      }
+    } catch {
+      // browser declined fullscreen
+    }
   }
 
   fail(reason, guard) {
