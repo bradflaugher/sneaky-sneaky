@@ -194,6 +194,16 @@ kbd {
   right: calc(152px + var(--sar));
   pointer-events: auto;
 }
+#btn-fullscreen {
+  top: calc(56px + var(--sat));
+  right: calc(152px + var(--sar));
+  pointer-events: auto;
+  font-size: 15px;
+  line-height: 1;
+}
+#btn-fullscreen.active {
+  background: var(--cyan);
+}
 .icon-btn {
   width: 36px;
   height: 36px;
@@ -1491,7 +1501,8 @@ kbd {
     width: 98px;
     height: 98px;
   }
-  #btn-pause {
+  #btn-pause,
+  #btn-fullscreen {
     right: calc(126px + var(--sar));
   }
   #objective {
@@ -1611,7 +1622,8 @@ kbd {
     width: 92px;
     height: 92px;
   }
-  #btn-pause {
+  #btn-pause,
+  #btn-fullscreen {
     right: calc(120px + var(--sar));
   }
   .tbtn.big {

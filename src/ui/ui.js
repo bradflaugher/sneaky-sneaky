@@ -37,6 +37,8 @@ export class UI {
     click('btn-clear-quit', 'quit');
     click('btn-vault-back', 'back');
     click('btn-pause', 'pause');
+    click('btn-fullscreen', 'fullscreen');
+    click('btn-fullscreen-pause', 'fullscreen');
     if (window.matchMedia('(pointer: coarse)').matches) this.setTouch(true);
   }
 
@@ -111,6 +113,20 @@ export class UI {
 
   setMute(muted) {
     $('btn-mute').textContent = `SOUND: ${muted ? 'OFF' : 'ON'}`;
+  }
+
+  setFullscreen(supported, active) {
+    const hudBtn = $('btn-fullscreen');
+    const pauseBtn = $('btn-fullscreen-pause');
+    hudBtn.classList.toggle('hidden', !supported);
+    pauseBtn.classList.toggle('hidden', !supported);
+    if (!supported) return;
+    hudBtn.classList.toggle('active', active);
+    hudBtn.setAttribute('aria-pressed', String(active));
+    hudBtn.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
+    hudBtn.title = active ? 'Exit fullscreen' : 'Fullscreen';
+    hudBtn.textContent = active ? '⤢' : '⛶';
+    pauseBtn.textContent = `FULLSCREEN: ${active ? 'ON' : 'OFF'}`;
   }
 
   setObjective({ tag, text, sub, done }) {
