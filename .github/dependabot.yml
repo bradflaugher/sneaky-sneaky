@@ -1,0 +1,34 @@
+version: 2
+
+# Policy: patch vulnerabilities fast, refresh everything else rarely.
+#
+# - Security fixes come from Dependabot security updates (a repo setting, not
+#   this file). They open a PR as soon as an advisory affects us. The schedule
+#   and cooldown below only govern version updates, so they never delay a fix.
+# - Version updates: one combined PR per quarter across Actions and npm.
+# - Releases must be 30 days old before a version update picks them up, so a
+#   broken or hijacked release has usually been pulled by then.
+
+multi-ecosystem-groups:
+  quarterly-refresh:
+    schedule:
+      interval: quarterly
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    patterns: ['*']
+    multi-ecosystem-group: quarterly-refresh
+    cooldown:
+      default-days: 30
+
+  - package-ecosystem: npm
+    directory: /
+    patterns: ['*']
+    multi-ecosystem-group: quarterly-refresh
+    cooldown:
+      default-days: 30
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns: ['*']
