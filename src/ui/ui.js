@@ -38,6 +38,7 @@ export class UI {
     click('btn-vault-back', 'back');
     click('btn-pause', 'pause');
     click('btn-fullscreen', 'fullscreen');
+    click('btn-fullscreen-title', 'fullscreen');
     click('btn-fullscreen-pause', 'fullscreen');
     if (window.matchMedia('(pointer: coarse)').matches) this.setTouch(true);
   }
@@ -117,8 +118,10 @@ export class UI {
 
   setFullscreen(supported, active) {
     const hudBtn = $('btn-fullscreen');
+    const titleBtn = $('btn-fullscreen-title');
     const pauseBtn = $('btn-fullscreen-pause');
     hudBtn.classList.toggle('hidden', !supported);
+    titleBtn.classList.toggle('hidden', !supported);
     pauseBtn.classList.toggle('hidden', !supported);
     if (!supported) return;
     hudBtn.classList.toggle('active', active);
@@ -126,6 +129,8 @@ export class UI {
     hudBtn.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
     hudBtn.title = active ? 'Exit fullscreen' : 'Fullscreen';
     hudBtn.textContent = active ? '⤢' : '⛶';
+    titleBtn.setAttribute('aria-pressed', String(active));
+    titleBtn.textContent = active ? '⤢ EXIT FULLSCREEN' : '⛶ FULLSCREEN';
     pauseBtn.textContent = `FULLSCREEN: ${active ? 'ON' : 'OFF'}`;
   }
 
