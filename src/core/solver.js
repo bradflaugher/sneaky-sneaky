@@ -13,6 +13,7 @@
 
 import { FLOOR, DIRS4, hasLineOfSight } from './grid.js';
 import { poseAt, angDiff } from './patrol.js';
+import { peripheralVision } from './stealth.js';
 
 export const STEP_DT = 0.4; // seconds per solver step (one cell at crouch speed)
 export const SOLVER_PAD_RANGE = 0.75;
@@ -113,7 +114,11 @@ export function markVisible(room, guards, t, out) {
     poseAt(g.timeline, t, pose);
     const range = g.vis.range + SOLVER_PAD_RANGE;
     const half = g.vis.half + SOLVER_PAD_ANGLE;
-    const reach = range + 0.6;
+    const periph = peripheralVision(g.vis, true);
+    const pRange = periph.range + SOLVER_PAD_RANGE;
+    const pHalf = Math.min(Math.PI, periph.half + SOLVER_PAD_ANGLE);
+    const reach = Math.max(range, pRange) + 0.6;
+    const pReach = pRange + 0.6;
     const fx = Math.cos(pose.ang);
     const fz = Math.sin(pose.ang);
     const x0 = Math.max(0, Math.floor(pose.x - reach));
@@ -132,17 +137,20 @@ export function markVisible(room, guards, t, out) {
           out[i] = 1;
           continue;
         }
-        // Cheap reject: the whole cell lies outside the padded cone.
+        // Cheap reject: the whole cell lies outside both the padded main and peripheral cones.
         const off = Math.acos(Math.max(-1, Math.min(1, ((ccx - pose.x) * fx + (ccz - pose.z) * fz) / cd)));
-        if (off > half + Math.asin(Math.min(1, 0.6 / cd))) continue;
+        const padCell = Math.asin(Math.min(1, 0.6 / cd));
+        if (off > half + padCell && (cd > pReach || off > pHalf + padCell)) continue;
         for (const [ox, oz] of SAMPLE_OFFSETS) {
           const px = ccx + ox;
           const pz = ccz + oz;
           const dx = px - pose.x;
           const dz = pz - pose.z;
           const d = Math.hypot(dx, dz);
-          if (d > range) continue;
-          if (Math.abs(angDiff(pose.ang, Math.atan2(dz, dx))) > half) continue;
+          const ang = Math.abs(angDiff(pose.ang, Math.atan2(dz, dx)));
+          const inMain = d <= range && ang <= half;
+          const inPeriph = d <= pRange && ang <= pHalf;
+          if (!inMain && !inPeriph) continue;
           if (hasLineOfSight(room, pose.x, pose.z, px, pz, true)) {
             out[i] = 1;
             break;

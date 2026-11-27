@@ -10,7 +10,7 @@ import { RNG, randomSeedString } from '../core/rng.js';
 import { FLOOR, cellAt, hasLineOfSight, findPath, nearestFloorCell } from '../core/grid.js';
 import { generateRoom } from '../core/generator.js';
 import { poseAt, angDiff } from '../core/patrol.js';
-import { canSee, canChoke, isBumping, detectRate, rankFor, CALLOUT_RADIUS, ALERT_SEARCH_TIME, ALERT_DETECT_MULT, guardsInEarshot, effectiveVision } from '../core/stealth.js';
+import { canSee, visionHit, peripheralVision, PERIPHERAL_DETECT_MULT, canChoke, isBumping, detectRate, rankFor, CALLOUT_RADIUS, ALERT_SEARCH_TIME, ALERT_DETECT_MULT, guardsInEarshot, effectiveVision } from '../core/stealth.js';
 import { THEMES, THEME_IDS } from '../core/themes.js';
 import { crawlRoute, pointAlong } from '../core/ducts.js';
 import { VENT_COLORS } from '../render/themeArt.js';
@@ -48,7 +48,7 @@ const TIPS = [
   'Knock to lure a guard over, then slip past where they were.',
   'Follow the ductwork overhead: each vent comes out where its duct ends.',
   'Red beams mean find the switch, or find a vent around them.',
-  'Sneak up directly behind a guard for a sleeper hold. Ghosts skip this.',
+  'Crouch directly behind a guard for a sleeper hold — they have peripheral vision up close. Ghosts skip this.',
 ];
 const SPOTTED = [
   'spotted you. Rude, but fair.',
@@ -689,17 +689,23 @@ export class Game {
         player: p.hidden ? null : { x: p.x, z: p.z, ang: p.ang },
         hasLoot: p.hasLoot,
         lasers: this.lasers,
-        guards: this.guards.map((g) => ({
-          x: g.pose.x,
-          z: g.pose.z,
-          ang: g.pose.ang,
-          range: g.def.vis.range,
-          half: g.def.vis.half,
-          meter: g.meter,
-          asleep: g.state === 'asleep' || g.state === 'held',
-          alert: g.state === 'alert',
-          wary: g.state !== 'patrol',
-        })),
+        guards: this.guards.map((g) => {
+          const vis = effectiveVision(g.def.vis, g.alertT > 0);
+          const periph = peripheralVision(vis, false);
+          return {
+            x: g.pose.x,
+            z: g.pose.z,
+            ang: g.pose.ang,
+            range: vis.range,
+            half: vis.half,
+            periphRange: periph.range,
+            periphHalf: periph.half,
+            meter: g.meter,
+            asleep: g.state === 'asleep' || g.state === 'held',
+            alert: g.state === 'alert',
+            wary: g.state !== 'patrol',
+          };
+        }),
       },
       t,
     );
@@ -879,7 +885,7 @@ export class Game {
     let best = null;
     let bestD = Infinity;
     for (const g of this.guards) {
-      if (!AWAKE.has(g.state) || !canChoke(g.pose, p.x, p.z)) continue;
+      if (!AWAKE.has(g.state) || !canChoke(g.pose, p.x, p.z, p.crouched)) continue;
       if (!hasLineOfSight(room, p.x, p.z, g.pose.x, g.pose.z, false)) continue;
       const d = Math.hypot(g.pose.x - p.x, g.pose.z - p.z);
       if (d < bestD) {
@@ -1100,13 +1106,15 @@ export class Game {
       let sees = false;
       if (live && !p.hidden) {
         const dist = Math.hypot(p.x - g.pose.x, p.z - g.pose.z);
+        const hit = visionHit(room, g.pose, p.x, p.z, p.crouched, vis);
         if (isBumping(room, g.pose, p.x, p.z)) {
           sees = true;
           g.meter += 7 * dt;
-        } else if (canSee(room, g.pose, p.x, p.z, p.crouched, vis)) {
+        } else if (hit) {
           sees = true;
           const mult = this.activeMods().detect * (heightened ? ALERT_DETECT_MULT : 1);
-          g.meter += detectRate(dist, vis.range, p.crouched) * mult * dt;
+          const zoneMult = hit === 'peripheral' ? PERIPHERAL_DETECT_MULT : hit === 'close' ? 1.25 : 1;
+          g.meter += detectRate(dist, vis.range, p.crouched) * mult * zoneMult * dt;
         }
         if (sees) {
           g.lastSeen = { x: p.x, z: p.z };

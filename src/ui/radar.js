@@ -117,6 +117,18 @@ export class Radar {
         continue;
       }
       const col = gd.alert ? '229,53,43' : gd.meter > 0.3 || gd.wary ? '255,210,58' : '58,232,255';
+      if (gd.periphRange && gd.periphHalf) {
+        g.fillStyle = `rgba(${col},0.16)`;
+        g.beginPath();
+        g.moveTo(X(gd.x), Y(gd.z));
+        const PN = 18;
+        for (let i = 0; i <= PN; i++) {
+          const a = gd.ang - gd.periphHalf + (2 * gd.periphHalf * i) / PN;
+          const d = castRay(room, gd.x, gd.z, Math.cos(a), Math.sin(a), gd.periphRange, false);
+          g.lineTo(X(gd.x + Math.cos(a) * d), Y(gd.z + Math.sin(a) * d));
+        }
+        g.fill();
+      }
       g.fillStyle = `rgba(${col},0.33)`;
       g.beginPath();
       g.moveTo(X(gd.x), Y(gd.z));
