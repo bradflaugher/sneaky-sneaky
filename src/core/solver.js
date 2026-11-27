@@ -116,6 +116,7 @@ export function markVisible(room, guards, t, out) {
     const range2 = range * range;
     const half = g.vis.half + SOLVER_PAD_ANGLE;
     const cosHalf = Math.cos(half);
+    const sinHalf = Math.sin(half);
     const periph = peripheralVision(g.vis, true);
     const pRange = periph.range + SOLVER_PAD_RANGE;
     const pRange2 = pRange * pRange;
@@ -147,12 +148,11 @@ export function markVisible(room, guards, t, out) {
           out[i] = 1;
           continue;
         }
-        // Cheap reject: the whole cell lies outside both the padded main and peripheral cones.
+        // Cheap conservative reject (no trig): whole cell lies outside both padded cones.
         const cd = Math.sqrt(cd2);
-        const off = Math.acos(Math.max(-1, Math.min(1, (cdx * fx + cdz * fz) / cd)));
-        const padCell = Math.asin(Math.min(1, 0.6 / cd));
-        const maybeMain = off <= half + padCell;
-        const maybePeriph = cd2 <= pReach2 && off <= pHalf + padCell;
+        const cdot = cdx * fx + cdz * fz;
+        const maybeMain = cdot >= cd * cosHalf - 0.6 * sinHalf - 0.15;
+        const maybePeriph = cd2 <= pReach2 && cdot >= cd * cosPHalf - 0.75;
         if (!maybeMain && !maybePeriph) continue;
         for (const [ox, oz] of SAMPLE_OFFSETS) {
           const px = ccx + ox;
