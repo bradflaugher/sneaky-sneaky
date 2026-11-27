@@ -1503,7 +1503,13 @@ kbd {
   }
   #btn-pause,
   #btn-fullscreen {
+    width: 42px;
+    height: 42px;
     right: calc(126px + var(--sar));
+  }
+  #btn-fullscreen {
+    top: calc(62px + var(--sat));
+    font-size: 18px;
   }
   #objective {
     max-width: calc(100vw - 186px - var(--sal) - var(--sar));
