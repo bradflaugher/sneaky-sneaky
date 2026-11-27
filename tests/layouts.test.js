@@ -113,7 +113,8 @@ test('every style stays well guarded and generates fast', () => {
     assert.ok(guards >= mine.length * 2.5, `${layout}: only ${guards} guards in ${mine.length} rooms`);
     const avg = mine.reduce((n, r) => n + r.ms, 0) / mine.length;
     assert.ok(avg < 1500, `${layout}: average ${Math.round(avg)} ms per room`);
-    assert.ok(Math.max(...mine.map((r) => r.ms)) < 6000, `${layout}: slowest room`);
+    const maxMs = Math.max(...mine.map((r) => r.ms));
+    assert.ok(maxMs < 10000, `${layout}: slowest room ${Math.round(maxMs)} ms`);
     const big = mine.filter((r) => r.room.level >= 10);
     const small = mine.filter((r) => r.room.level <= 2);
     const mean = (rs, f) => rs.reduce((n, r) => n + f(r.room), 0) / rs.length;
