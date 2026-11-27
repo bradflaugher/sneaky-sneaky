@@ -12,7 +12,7 @@
 // A room that passes solveStealth is always beatable as a perfect ghost.
 
 import { FLOOR, DIRS4, hasLineOfSight } from './grid.js';
-import { poseAt, angDiff } from './patrol.js';
+import { poseAt } from './patrol.js';
 import { peripheralVision } from './stealth.js';
 
 export const STEP_DT = 0.4; // seconds per solver step (one cell at crouch speed)
@@ -113,12 +113,19 @@ export function markVisible(room, guards, t, out) {
   for (const g of guards) {
     poseAt(g.timeline, t, pose);
     const range = g.vis.range + SOLVER_PAD_RANGE;
+    const range2 = range * range;
     const half = g.vis.half + SOLVER_PAD_ANGLE;
+    const cosHalf = Math.cos(half);
     const periph = peripheralVision(g.vis, true);
     const pRange = periph.range + SOLVER_PAD_RANGE;
+    const pRange2 = pRange * pRange;
     const pHalf = Math.min(Math.PI, periph.half + SOLVER_PAD_ANGLE);
+    const cosPHalf = Math.cos(pHalf);
     const reach = Math.max(range, pRange) + 0.6;
+    const reach2 = reach * reach;
+    const near2 = NEAR_RADIUS * NEAR_RADIUS;
     const pReach = pRange + 0.6;
+    const pReach2 = pReach * pReach;
     const fx = Math.cos(pose.ang);
     const fz = Math.sin(pose.ang);
     const x0 = Math.max(0, Math.floor(pose.x - reach));
@@ -126,30 +133,38 @@ export function markVisible(room, guards, t, out) {
     const y0 = Math.max(0, Math.floor(pose.z - reach));
     const y1 = Math.min(h - 1, Math.floor(pose.z + reach));
     for (let cy = y0; cy <= y1; cy++) {
+      const ccz = cy + 0.5;
+      const cdz = ccz - pose.z;
+      const cdz2 = cdz * cdz;
       for (let cx = x0; cx <= x1; cx++) {
         const i = cy * w + cx;
         if (out[i] || cells[i] !== FLOOR) continue;
         const ccx = cx + 0.5;
-        const ccz = cy + 0.5;
-        const cd = Math.hypot(ccx - pose.x, ccz - pose.z);
-        if (cd > reach) continue;
-        if (cd < NEAR_RADIUS) {
+        const cdx = ccx - pose.x;
+        const cd2 = cdx * cdx + cdz2;
+        if (cd2 > reach2) continue;
+        if (cd2 < near2) {
           out[i] = 1;
           continue;
         }
         // Cheap reject: the whole cell lies outside both the padded main and peripheral cones.
-        const off = Math.acos(Math.max(-1, Math.min(1, ((ccx - pose.x) * fx + (ccz - pose.z) * fz) / cd)));
+        const cd = Math.sqrt(cd2);
+        const off = Math.acos(Math.max(-1, Math.min(1, (cdx * fx + cdz * fz) / cd)));
         const padCell = Math.asin(Math.min(1, 0.6 / cd));
-        if (off > half + padCell && (cd > pReach || off > pHalf + padCell)) continue;
+        const maybeMain = off <= half + padCell;
+        const maybePeriph = cd2 <= pReach2 && off <= pHalf + padCell;
+        if (!maybeMain && !maybePeriph) continue;
         for (const [ox, oz] of SAMPLE_OFFSETS) {
           const px = ccx + ox;
           const pz = ccz + oz;
           const dx = px - pose.x;
           const dz = pz - pose.z;
-          const d = Math.hypot(dx, dz);
-          const ang = Math.abs(angDiff(pose.ang, Math.atan2(dz, dx)));
-          const inMain = d <= range && ang <= half;
-          const inPeriph = d <= pRange && ang <= pHalf;
+          const d2 = dx * dx + dz * dz;
+          if (d2 > range2 && d2 > pRange2) continue;
+          const d = Math.sqrt(d2);
+          const dot = dx * fx + dz * fz;
+          const inMain = maybeMain && d2 <= range2 && dot >= d * cosHalf;
+          const inPeriph = maybePeriph && d2 <= pRange2 && dot >= d * cosPHalf;
           if (!inMain && !inPeriph) continue;
           if (hasLineOfSight(room, pose.x, pose.z, px, pz, true)) {
             out[i] = 1;
